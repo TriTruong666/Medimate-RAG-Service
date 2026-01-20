@@ -1,0 +1,14 @@
+# Enviroment
+__pycache__/
+*.pyc
+.env
+.env.*
+.DS_Store
+virtual
+virtual/*
+
+# Data
+data
+models_weights
+
+*.gguf
