@@ -6,56 +6,62 @@ from app.core.config import settings
 llm = None
 embed_model = None
 
-# --- 1. HÀM ĐỊNH DẠNG PROMPT CHO QWEN (QUAN TRỌNG) ---
-# Qwen dùng chuẩn ChatML: <|im_start|>...<|im_end|>
-# Nếu không có cái này, model sẽ không biết đâu là lời bạn, đâu là lời nó => Bị lặp
+
 def messages_to_prompt(messages):
-    prompt = ""
+    # --- THAY ĐỔI Ở ĐÂY ---
+    # Thay vì chờ system prompt từ bên ngoài, ta gán cứng luôn.
+    # Đây là mệnh lệnh tối cao, model bắt buộc phải nghe theo.
+    prompt = (
+        "<|im_start|>system\n"
+        "You are a English AI assistant.. "
+        "Your primary language is English. "
+        "Even if the document or question is in Vietnamese, you MUST answer in English.. "
+        "Explain detail by English.\n"
+        "<|im_end|>\n"
+    )
+    # ----------------------
+
     for message in messages:
-        if message.role == 'system':
-            prompt += f"<|im_start|>system\n{message.content}<|im_end|>\n"
-        elif message.role == 'user':
+        if message.role == "system":
+            continue
+        elif message.role == "user":
             prompt += f"<|im_start|>user\n{message.content}<|im_end|>\n"
-        elif message.role == 'assistant':
+        elif message.role == "assistant":
             prompt += f"<|im_start|>assistant\n{message.content}<|im_end|>\n"
-    
-    # Mồi cho AI bắt đầu trả lời
+
     prompt += "<|im_start|>assistant\n"
     return prompt
+
 
 def completion_to_prompt(completion):
     return f"<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
 
+
 # -----------------------------------------------------
+
 
 def get_llm():
     global llm
     if llm is None:
         print(f"Loading LLM from: {settings.MODEL_PATH}")
-        
+
         llm = LlamaCPP(
             model_path=settings.MODEL_PATH,
-            
-            # --- 2. CẤU HÌNH THÔNG MINH HƠN ---
-            temperature=0.1,       # Giảm sáng tạo xuống thấp để trả lời đúng trọng tâm
-            max_new_tokens=512,    # Giới hạn độ dài câu trả lời (tránh viết sớ)
-            context_window=4096,   # Độ dài ngữ cảnh nhớ được
-            
-            # --- 3. THUỐC TRỊ BỆNH LẶP TỪ (REPEAT PENALTY) ---
+            temperature=0.2,  # Giảm sáng tạo xuống thấp để trả lời đúng trọng tâm
+            max_new_tokens=512,  # Giới hạn độ dài câu trả lời (tránh viết sớ)
+            context_window=2048,  # Độ dài ngữ cảnh nhớ được(máy mạnh cứ nhân đôi lên)
             # repeat_penalty=1.2 nghĩa là: Nếu lặp lại câu cũ, điểm số sẽ bị chia 1.2 => AI sẽ né câu đó ra
             generate_kwargs={
-                "repeat_penalty": 1.2, 
+                "repeat_penalty": 1.2,
                 "top_p": 0.9,
-                "stop": ["<|im_end|>", "User:"] # Gặp ký tự này là CÂM NGAY
+                "stop": ["<|im_end|>", "User:"],
             },
-            
-            # Gắn hàm định dạng prompt đã viết ở trên vào
             messages_to_prompt=messages_to_prompt,
             completion_to_prompt=completion_to_prompt,
-            
-            verbose=False
+            verbose=False,
         )
     return llm
+
 
 def get_embed_model():
     global embed_model
@@ -63,6 +69,6 @@ def get_embed_model():
         print(f"Loading Embedding Model: {settings.EMBEDDING_MODEL}")
         embed_model = HuggingFaceEmbedding(
             model_name=settings.EMBEDDING_MODEL,
-            cache_folder=os.path.join(os.getcwd(), "app", "models_weights")
+            cache_folder=os.path.join(os.getcwd(), "app", "models_weights"),
         )
     return embed_model

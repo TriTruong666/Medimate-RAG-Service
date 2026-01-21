@@ -1,84 +1,140 @@
 import sys
 import os
 
-# 1. Thêm đường dẫn hiện tại vào hệ thống để Python tìm thấy thư mục 'app'
+from app.core.config import settings
+from app.services.file_service import load_documents_from_folder, process_file_in_memory
+from app.services.rag_engine import ingest_documents, get_index
+from llama_index.core import PromptTemplate
+
 sys.path.append(os.getcwd())
 
-# 2. Import lại các hàm từ code cũ của bạn
-from app.core.config import settings
-from app.services.file_service import load_documents_from_folder
-from app.services.rag_engine import ingest_documents, get_index
+
+def print_banner():
+    logo = r"""
+███╗   ███╗███████╗██████╗ ██╗███╗   ███╗ █████╗ ████████╗███████╗
+████╗ ████║██╔════╝██╔══██╗██║████╗ ████║██╔══██╗╚══██╔══╝██╔════╝
+██╔████╔██║█████╗  ██║  ██║██║██╔████╔██║███████║   ██║   █████╗  
+██║╚██╔╝██║██╔══╝  ██║  ██║██║██║╚██╔╝██║██╔══██║   ██║   ██╔══╝  
+██║ ╚═╝ ██║███████╗██████╔╝██║██║ ╚═╝ ██║██║  ██║   ██║   ███████╗
+╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝
+
+██████╗  █████╗  ██████╗     ███████╗███████╗██████╗ ██╗   ██╗██╗ ██████╗███████╗
+██╔══██╗██╔══██╗██╔════╝     ██╔════╝██╔════╝██╔══██╗██║   ██║██║██╔════╝██╔════╝
+██████╔╝███████║██║  ███╗    ███████╗█████╗  ██████╔╝██║   ██║██║██║     █████╗  
+██╔══██╗██╔══██║██║   ██║    ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██║██║     ██╔══╝  
+██║  ██║██║  ██║╚██████╔╝    ███████║███████╗██║  ██║ ╚████╔╝ ██║╚██████╗███████╗
+╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝     ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚═╝ ╚═════╝╚══════╝
+    """
+    print(logo)
+
 
 def main():
-    print("==================================================")
-    print(f"🤖  HỆ THỐNG RAG COMMAND LINE - {settings.PROJECT_NAME}")
-    print("==================================================\n")
+    print_banner()
 
-    # BƯỚC 1: HỎI CÓ MUỐN HỌC TÀI LIỆU MỚI KHÔNG
-    # Kiểm tra xem có cần tạo thư mục không
-    if not os.path.exists(settings.UPLOAD_DIR):
-        os.makedirs(settings.UPLOAD_DIR)
+    print("1. Chat ngay")
+    print("2. Nạp thêm dữ liệu mới")
 
-    print(f"📁 Folder tài liệu: {settings.UPLOAD_DIR}")
-    choice = input("❓ Bạn có muốn quét và học tài liệu mới không? (y/n): ").strip().lower()
+    choice = input("Mời bạn chọn (1/2): ").strip()
 
-    if choice == 'y':
-        print("\n[1/2] 📖 Đang đọc file...")
-        documents = load_documents_from_folder()
-        
+    documents = []
+
+    if choice == "2":
+        mode = (
+            input("Bạn muốn nạp từ đâu? (cpu: quét folder / ram: giả lập upload): ")
+            .strip()
+            .lower()
+        )
+
+        if mode == "cpu":
+            print("\nĐang quét folder uploads...")
+            documents = load_documents_from_folder()
+
+        elif mode == "ram":
+            if not os.path.exists(settings.UPLOAD_DIR):
+                print("Thư mục uploads không tồn tại!")
+            else:
+                print("\nĐang xử lý giả lập RAM...")
+                all_files = os.listdir(settings.UPLOAD_DIR)
+                for filename in all_files:
+                    file_path = os.path.join(settings.UPLOAD_DIR, filename)
+                    if os.path.isfile(file_path):
+                        try:
+                            with open(file_path, "rb") as f:
+                                file_bytes = f.read()
+                            docs = process_file_in_memory(filename, file_bytes)
+                            if docs:
+                                documents.extend(docs)
+                                print(f"Đã đọc: {filename}")
+                        except Exception:
+                            pass
+
         if documents:
-            print(f"[2/2] 🧠 Đang nạp vào bộ nhớ (Embedding)... Vui lòng chờ!")
-            # Gọi hàm từ rag_engine.py
-            msg = ingest_documents(documents)
-            print(f"✅ {msg}")
+            print(
+                f"\nĐang nạp {len(documents)} tài liệu vào ChromaDB (Lâu hay nhanh tùy độ dày)..."
+            )
+            ingest_documents(documents)
         else:
-            print("⚠️ Không tìm thấy file nào trong thư mục uploads.")
+            print("\nKhông tìm thấy tài liệu mới nào.")
 
-    # BƯỚC 2: LOAD INDEX ĐỂ CHAT
-    print("\n⏳ Đang khởi động Model AI & Database...")
+    print("\nĐang khởi động Model AI & Database...")
     index = get_index()
 
     if index is None:
-        print("❌ Lỗi: Chưa có dữ liệu (Index). Vui lòng bỏ file vào data/uploads và chọn 'y' để học.")
+        print(
+            "Lỗi: Chưa có dữ liệu (Index). Vui lòng bỏ file vào data/uploads và chọn 'y' để học."
+        )
         return
 
     # Tạo Query Engine (Bộ máy trả lời)
-    query_engine = index.as_query_engine(
-        similarity_top_k=3,    # Lấy 3 đoạn văn bản liên quan nhất
-        response_mode="compact", # Trả lời ngắn gọn súc tích
+    qa_template_str = (
+        "Below is contextual information extracted from the document.:\n"
+        "---------------------\n"
+        "{context_str}\n"
+        "---------------------\n"
+        "Based on the above context, please answer the question: {query_str}\n\n"
+        "Requirements:\n"
+        "- Provide a DETAILED, COMPLETE, and SPECIFIC answer.\n"
+        "- Explain the main points clearly, don't give abrupt answers.\n"
+        "- Present your ideas clearly and concisely; if you have multiple points, use bullet points.\n"
+        "- Answer entirely in English.\n"
+        "- If the document does NOT contain the information, state unequivocally that it cannot be found.\n"
+    )
+    qa_template = PromptTemplate(qa_template_str)
 
-        system_prompt=(
-            "Bạn là một trợ lý AI thông minh, chuyên hỗ trợ tư vấn dựa trên tài liệu."
-            " Nhiệm vụ của bạn là trả lời câu hỏi của người dùng HOÀN TOÀN BẰNG TIẾNG VIỆT."
-            " Dựa sát vào ngữ cảnh được cung cấp để trả lời ngắn gọn, súc tích."
-        )
+    query_engine = index.as_query_engine(
+        similarity_top_k=3,
+        response_mode="refine",
+        text_qa_template=qa_template,
+        streaming=True,
     )
 
-    print("\n✅ HỆ THỐNG ĐÃ SẴN SÀNG! (Gõ 'exit' để thoát)")
+    print("\nHỆ THỐNG ĐÃ SẴN SÀNG! (Gõ 'exit' để thoát)")
     print("-" * 50)
 
     # BƯỚC 3: VÒNG LẶP CHAT
     while True:
         try:
-            question = input("\n👤 Bạn: ")
-            
-            if question.lower() in ['exit', 'quit', 'thoat']:
-                print("👋 Tạm biệt!")
+            question = input("\nTao: ")
+
+            if question.lower() in ["exit", "quit", "thoat"]:
+                print("Tạm biệt!")
                 break
-            
+
             if not question.strip():
                 continue
 
-            # Thực hiện hỏi AI
-            print("🤖 AI: Đang suy nghĩ...", end="\r")
-            response = query_engine.query(question)
-            
-            # Xóa dòng đang suy nghĩ
-            print(" " * 30, end="\r")
-            print(f"🤖 AI: {response}")
+            print("AI: ", end="", flush=True)
+
+            streaming_response = query_engine.query(question)
+
+            for token in streaming_response.response_gen:
+                print(token, end="", flush=True)
+
+            print()
 
         except Exception as e:
-            print(f"\n❌ Có lỗi xảy ra: {e}")
+            print(f"\nCó lỗi xảy ra: {e}")
+
 
 if __name__ == "__main__":
     main()

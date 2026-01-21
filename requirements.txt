@@ -5,8 +5,12 @@ llama-index-core
 llama-index-llms-llama-cpp
 llama-index-embeddings-huggingface
 llama-index-vector-stores-chroma
+qdrant-client
+llama-index-vector-stores-qdrant
 chromadb
 pydantic-settings
 python-dotenv
 pypdf
 docx2txt
+hf_xet
+python-docx
