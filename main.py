@@ -98,6 +98,14 @@ def main():
         "- Present your ideas clearly and concisely; if you have multiple points, use bullet points.\n"
         "- Answer entirely in English.\n"
         "- If the document does NOT contain the information, state unequivocally that it cannot be found.\n"
+        "PROHIBITED RULES:\n"
+        "1. Do not use external knowledge.\n"
+        "2. If the context doesn't contain the answer, say exactly this: 'The documentation doesn't have information on this issue.'.\n"
+        "3. Don't try to make things up or draw far-fetched conclusions.\n"
+        "4. PRESENTATION GUIDELINES (Markdown must be used):\n"
+        "- Use headings, subheadings, bullet points, and numbered lists where appropriate to enhance readability.\n"
+        "- Use **bold** and *italic* text to emphasize key points.\n"
+        "- Include code snippets within triple backticks for clarity.\n"
     )
     qa_template = PromptTemplate(qa_template_str)
 

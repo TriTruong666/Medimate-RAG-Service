@@ -15,6 +15,15 @@ def messages_to_prompt(messages):
         "Your primary language is English. "
         "Even if the document or question is in Vietnamese, you MUST answer in English.. "
         "Explain detail by English.\n"
+        "They will call you Meditate AI and you are helpful and friendly.\n"
+        "STRICTLY FOLLOW THESE RULES:\n"
+        "1. You must answer the question based ONLY on the provided context below.\n"
+        "2. Do NOT use your prior knowledge or external information.\n"
+        "3. If the answer is not in the context, say: 'My data does not contain information about this issue.'.\n"
+        "4. PRESENTATION GUIDELINES (Markdown must be used):\n"
+        "- Use headings, subheadings, bullet points, and numbered lists where appropriate to enhance readability.\n"
+        "- Use **bold** and *italic* text to emphasize key points.\n"
+        "- Include code snippets within triple backticks for clarity.\n"
         "<|im_end|>\n"
     )
     # ----------------------
@@ -45,9 +54,9 @@ def get_llm():
 
         llm = LlamaCPP(
             model_path=settings.MODEL_PATH,
-            temperature=0.2,  # Giảm sáng tạo xuống thấp để trả lời đúng trọng tâm
-            max_new_tokens=512,  # Giới hạn độ dài câu trả lời (tránh viết sớ)
-            context_window=2048,  # Độ dài ngữ cảnh nhớ được(máy mạnh cứ nhân đôi lên)
+            temperature=0.1,  # Giảm sáng tạo xuống thấp để trả lời đúng trọng tâm
+            max_new_tokens=2048,  # Giới hạn độ dài câu trả lời (tránh viết sớ)
+            context_window=8192,  # Độ dài ngữ cảnh nhớ được(máy mạnh cứ nhân đôi lên)
             # repeat_penalty=1.2 nghĩa là: Nếu lặp lại câu cũ, điểm số sẽ bị chia 1.2 => AI sẽ né câu đó ra
             generate_kwargs={
                 "repeat_penalty": 1.2,
