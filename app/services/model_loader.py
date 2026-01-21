@@ -8,9 +8,7 @@ embed_model = None
 
 
 def messages_to_prompt(messages):
-    # --- THAY ĐỔI Ở ĐÂY ---
-    # Thay vì chờ system prompt từ bên ngoài, ta gán cứng luôn.
-    # Đây là mệnh lệnh tối cao, model bắt buộc phải nghe theo.
+
     prompt = (
         "<|im_start|>system\n"
         "You are a English AI assistant.. "

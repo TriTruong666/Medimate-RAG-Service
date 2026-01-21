@@ -6,7 +6,6 @@ import pypdf
 import docx
 
 
-# --- CÁCH 1: Dùng cho DEV (Quét folder) ---
 def load_documents_from_folder():
     if not os.path.exists(settings.UPLOAD_DIR):
         os.makedirs(settings.UPLOAD_DIR)
@@ -15,7 +14,6 @@ def load_documents_from_folder():
 
     print(f"Đang quét file trong: {settings.UPLOAD_DIR}")
 
-    # Định nghĩa các đuôi file hỗ trợ
     required_exts = [".pdf", ".docx", ".doc", ".txt"]
 
     try:
@@ -35,7 +33,6 @@ def load_documents_from_folder():
         return []
 
 
-# --- CÁCH 2: Dùng cho PRODUCTION/API (Xử lý trên RAM) ---
 def process_file_in_memory(filename: str, file_bytes: bytes):
     """
     Xử lý file từ byte raw (không cần lưu xuống ổ cứng).
@@ -71,7 +68,6 @@ def process_file_in_memory(filename: str, file_bytes: bytes):
         print(f"Lỗi đọc file {filename}: {e}")
         return []
 
-    # Nếu trích xuất được chữ thì trả về Document
     if text_content.strip():
         # metadata giúp AI biết nội dung này từ file nào
         return [Document(text=text_content, metadata={"filename": filename})]
