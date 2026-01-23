@@ -15,3 +15,7 @@ pypdf
 docx2txt
 hf_xet
 python-docx
+sqlalchemy
+pgvector
+alembic
+psycopg2-binary

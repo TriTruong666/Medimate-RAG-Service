@@ -1,14 +1,20 @@
 import os
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = os.getcwd()
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Meditate RAG Service"
+    AUTHOR_NAME: str = "TriTruong666"
     MODEL_PATH: str = os.path.join(
         BASE_DIR, "app", "models_weights", "qwen2.5-1.5b-instruct-q4_k_m.gguf"
     )
+
+    RAG_DB_URL: str = os.getenv("RAG_DB_URL")
 
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "app", "data", "uploads")
 
