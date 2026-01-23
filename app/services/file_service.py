@@ -1,5 +1,6 @@
 import os
 import io
+import json
 from llama_index.core import SimpleDirectoryReader, Document
 from app.core.config import settings
 import pypdf
@@ -36,7 +37,7 @@ def load_documents_from_folder():
 def process_file_in_memory(filename: str, file_bytes: bytes):
     """
     Xử lý file từ byte raw (không cần lưu xuống ổ cứng).
-    Hỗ trợ: PDF, DOCX, TXT
+    Hỗ trợ: PDF, DOCX, TXT, JSON
     """
     text_content = ""
     file_stream = io.BytesIO(file_bytes)
@@ -59,6 +60,12 @@ def process_file_in_memory(filename: str, file_bytes: bytes):
         # 3. Xử lý TXT
         elif filename.lower().endswith(".txt"):
             text_content = file_stream.read().decode("utf-8")
+
+        # 4. Xử lý JSON
+        elif filename.lower().endswith(".json"):
+            json_str = file_stream.read().decode("utf-8")
+            data = json.loads(json_str)
+            text_content = json.dumps(data, ensure_ascii=False, indent=2)
 
         else:
             print(f"Định dạng file chưa hỗ trợ: {filename}")
