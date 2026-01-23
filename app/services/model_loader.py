@@ -55,11 +55,11 @@ def get_llm():
         llm = LlamaCPP(
             model_path=settings.MODEL_PATH,
             temperature=0.1,  # Giảm sáng tạo xuống thấp để trả lời đúng trọng tâm
-            max_new_tokens=2048,  # Giới hạn độ dài câu trả lời (tránh viết sớ)
-            context_window=8192,  # Độ dài ngữ cảnh nhớ được(máy mạnh cứ nhân đôi lên)
+            max_new_tokens=512,  # Giới hạn độ dài câu trả lời (tránh viết sớ)
+            context_window=3900,  # Độ dài ngữ cảnh nhớ được(máy mạnh cứ nhân đôi lên)
             # repeat_penalty=1.2 nghĩa là: Nếu lặp lại câu cũ, điểm số sẽ bị chia 1.2 => AI sẽ né câu đó ra
             generate_kwargs={
-                "repeat_penalty": 1.2,
+                "repeat_penalty": 1.1,
                 "top_p": 0.9,
                 "stop": ["<|im_end|>", "User:"],
             },

@@ -5,6 +5,7 @@ llama-index-core
 llama-index-llms-llama-cpp
 llama-index-embeddings-huggingface
 llama-index-vector-stores-chroma
+llama-index-readers-file
 qdrant-client
 llama-index-vector-stores-qdrant
 chromadb
