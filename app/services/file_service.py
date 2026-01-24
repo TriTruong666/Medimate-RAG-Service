@@ -1,8 +1,7 @@
 import os
 import io
 import json
-from llama_index.core import SimpleDirectoryReader, Document
-from app.core.config import settings
+from llama_index.core import Document
 import pypdf
 import docx
 
