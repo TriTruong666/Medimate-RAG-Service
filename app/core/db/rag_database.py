@@ -1,9 +1,19 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from ..config import settings
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from app.core.config import settings
 
 rag_engine = create_engine(settings.RAG_DB_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(bind=rag_engine, autocommit=False, autoflush=False)
 
-RagBase = declarative_base()
+
+class RagBase(DeclarativeBase):
+    pass
+
+
+def get_db():
+    db = SessionLocal()  # Mở kết nối
+    try:
+        yield db
+    finally:
+        db.close()
