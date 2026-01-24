@@ -14,15 +14,13 @@ class Settings(BaseSettings):
         BASE_DIR, "app", "models_weights", "qwen2.5-1.5b-instruct-q4_k_m.gguf"
     )
 
-    RAG_DB_URL: str = os.getenv("RAG_DB_URL")
-
-    UPLOAD_DIR: str = os.path.join(BASE_DIR, "app", "data", "uploads")
-
-    VECTOR_DB_DIR: str = os.path.join(BASE_DIR, "app", "data", "vector_store")
+    RAW_UPLOAD_PATH: str = os.path.join(BASE_DIR, "data", "raw_data")
 
     CHROMA_DB_DIR: str = os.path.join(BASE_DIR, "app", "data", "chroma_db")
 
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    RAG_DB_URL: str = os.getenv("RAG_DB_URL")
 
 
 settings = Settings()

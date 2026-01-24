@@ -17,7 +17,7 @@ class Embedding(RagBase):
     content = Column(Text, nullable=False)
     embedding = Column(
         Vector(384), nullable=False
-    )  # Phù hợp cho con all-MiniLM-L6-v2 384 dimensional dense vector space
+    )  # phù hợp cho con all-MiniLM-L6-v2 384 dimensional dense vector space
 
     metadata_ = Column("metadata", JSON, nullable=False)
 
