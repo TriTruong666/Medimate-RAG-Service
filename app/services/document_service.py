@@ -12,7 +12,10 @@ class DocumentService:
     file_types = ["pdf", "docx", "txt", "text", "doc", "json"]
     @staticmethod
     def save_upload_file(db: Session, file: UploadFile, filename: str):
-        validate_file_type(file, DocumentService.file_types)
+        file_extension = file.filename.split(".")[-1].lower()
+        if file_extension not in DocumentService.file_types:
+            APIResponse.error(message="Loại file không hợp lệ, chỉ chấp nhận: " + ", ".join(allowed_types), status_code=400)
+            return
 
         file_checksum = calculate_file_hash(file)
 
@@ -21,7 +24,8 @@ class DocumentService:
         )
 
         if existed_doc:
-            raise HTTPException(status_code=400, message="File này đã tồn tại rồi")
+            APIResponse.error(message="File đã tồn tại trong hệ thống", status_code=400)
+            return
 
         file_path = os.path.join(settings.RAW_UPLOAD_PATH, filename)
         if os.path.exists(file_path):
@@ -34,7 +38,7 @@ class DocumentService:
         file_size_in_bytes = os.path.getsize(file_path)
 
         new_doc = Document(
-            doc_name=filename,
+            doc_name=filename.split(".")[0],
             file_path=file_path,
             type=filename.split(".")[-1],
             status="uploaded",
@@ -69,7 +73,4 @@ def calculate_file_hash(file: UploadFile) -> str:
 
     return sha256_hash.hexdigest()
 
-def validate_file_type(file: UploadFile, allowed_types: list):
-    file_extension = file.filename.split(".")[-1].lower()
-    if file_extension not in allowed_types:
-        APIResponse.error(message="Loại file không hợp lệ, chỉ chấp nhận: " + ", ".join(allowed_types), status_code=400)
+        
