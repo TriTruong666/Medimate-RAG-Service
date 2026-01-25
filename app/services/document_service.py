@@ -14,7 +14,7 @@ class DocumentService:
     def save_upload_file(db: Session, file: UploadFile, filename: str):
         file_extension = file.filename.split(".")[-1].lower()
         if file_extension not in DocumentService.file_types:
-            APIResponse.error(message="Loại file không hợp lệ, chỉ chấp nhận: " + ", ".join(allowed_types), status_code=400)
+            APIResponse.error(message="Loại file không hợp lệ, chỉ chấp nhận: " + ", ".join(DocumentService.file_types), status_code=400)
             return
 
         file_checksum = calculate_file_hash(file)
