@@ -20,13 +20,13 @@ def process_file_in_memory(filename: str, file_bytes: bytes):
                     text_content += extracted + "\n"
 
         # 2. Xử lý DOCX
-        elif filename.lower().endswith(".docx"):
+        elif filename.lower().endswith(".docx") or filename.lower().endswith(".doc"):
             doc = docx.Document(file_stream)
             for para in doc.paragraphs:
                 text_content += para.text + "\n"
 
         # 3. Xử lý TXT
-        elif filename.lower().endswith(".txt"):
+        elif filename.lower().endswith(".txt") or filename.lower().endswith(".text"):
             text_content = file_stream.read().decode("utf-8")
 
         # 4. Xử lý JSON

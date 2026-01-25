@@ -31,3 +31,14 @@ async def list_documents(
         message="Lấy danh sách thành công",
         data=result
     )
+
+@router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
+async def process_document(
+    document_id: str,
+    db: Session = Depends(get_db)
+):
+    result = DocumentService.process_document(db, document_id)
+    return APIResponse.success(
+        message=result["message"],
+        data=None
+    )
