@@ -1,6 +1,7 @@
 import os
 import hashlib
 import shutil
+from sqlalchemy import desc
 from fastapi import UploadFile, HTTPException
 from app.core.config import settings
 from sqlalchemy.orm import Session
@@ -14,8 +15,10 @@ class DocumentService:
     def save_upload_file(db: Session, file: UploadFile, filename: str):
         file_extension = file.filename.split(".")[-1].lower()
         if file_extension not in DocumentService.file_types:
-            APIResponse.error(message="Loại file không hợp lệ, chỉ chấp nhận: " + ", ".join(DocumentService.file_types), status_code=400)
-            return
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Loại file không hợp lệ. Chỉ chấp nhận: {', '.join(DocumentService.file_types)}"
+            )
 
         file_checksum = calculate_file_hash(file)
 
@@ -24,8 +27,10 @@ class DocumentService:
         )
 
         if existed_doc:
-            APIResponse.error(message="File đã tồn tại trong hệ thống", status_code=400)
-            return
+            raise HTTPException(
+                status_code=400, 
+                detail="File này đã tồn tại trong hệ thống rồi!"
+            )
 
         file_path = os.path.join(settings.RAW_UPLOAD_PATH, filename)
         if os.path.exists(file_path):
@@ -52,6 +57,40 @@ class DocumentService:
         doc_schema = DocumentResponse.model_validate(new_doc)
 
         return {"message": f"Upload file {filename} thành công", "data": doc_schema}
+    
+    @staticmethod
+    def get_list_documents(db: Session, page: int, limit: int, search_query: str = None):
+
+        skip = (page - 1) * limit
+   
+        query = db.query(Document)
+
+        if search_query:
+            search = f"%{search_query}%"
+            query = query.filter(Document.doc_name.ilike(search))
+
+        total_records = query.count()
+
+        documents = query.order_by(desc(Document.created_at))\
+                         .offset(skip)\
+                         .limit(limit)\
+                         .all()
+        
+        import math
+        total_pages = math.ceil(total_records / limit) if limit > 0 else 0
+    
+        doc_schemas = [DocumentResponse.model_validate(doc) for doc in documents]
+    
+        return {
+            "items": doc_schemas,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "total_records": total_records
+            }
+        }
+        
 
 
 def calculate_file_hash(file: UploadFile) -> str:
