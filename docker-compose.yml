@@ -1,0 +1,14 @@
+services:
+  rag_db:
+    image: pgvector/pgvector:pg16
+    container_name: medimate_db_test
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    volumes:
+      - rag_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  rag_postgres_data:

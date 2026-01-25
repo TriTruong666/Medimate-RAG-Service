@@ -80,10 +80,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 async def general_exception_handler(request: Request, exc: Exception):
-    """
-    Bắt tất cả các lỗi còn lại (Lỗi 500 - Server Error).
-    Ví dụ: Code bị bug, chia cho 0, database mất kết nối...
-    """
     # Ghi log để dev biết đường sửa
     logger.error(f"Lỗi không mong muốn: {exc}", exc_info=True)
 

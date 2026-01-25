@@ -4,12 +4,16 @@ import shutil
 from fastapi import UploadFile, HTTPException
 from app.core.config import settings
 from sqlalchemy.orm import Session
-from app.schemas import Document
-
+from app.models import Document
+from app.core.common.interceptor import APIResponse
+from app.schemas.document import DocumentResponse
 
 class DocumentService:
+    file_types = ["pdf", "docx", "txt", "text", "doc", "json"]
     @staticmethod
     def save_upload_file(db: Session, file: UploadFile, filename: str):
+        validate_file_type(file, DocumentService.file_types)
+
         file_checksum = calculate_file_hash(file)
 
         existed_doc = (
@@ -22,10 +26,12 @@ class DocumentService:
         file_path = os.path.join(settings.RAW_UPLOAD_PATH, filename)
         if os.path.exists(file_path):
             filename = f"{file_checksum[:8]}_{filename}"
-            file_path = os.path.join(settings.RAW_DOCS_DIR, filename)
+            file_path = os.path.join(settings.RAW_UPLOAD_PATH, filename)
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
+        
+        file_size_in_bytes = os.path.getsize(file_path)
 
         new_doc = Document(
             doc_name=filename,
@@ -33,12 +39,15 @@ class DocumentService:
             type=filename.split(".")[-1],
             status="uploaded",
             checksum=file_checksum,
+            file_size=file_size_in_bytes,
         )
         db.add(new_doc)
         db.commit()
         db.refresh(new_doc)
 
-        return {"message": f"Upload file {filename} thành công", "data": new_doc}
+        doc_schema = DocumentResponse.model_validate(new_doc)
+
+        return {"message": f"Upload file {filename} thành công", "data": doc_schema}
 
 
 def calculate_file_hash(file: UploadFile) -> str:
@@ -59,3 +68,8 @@ def calculate_file_hash(file: UploadFile) -> str:
     file.file.seek(0)
 
     return sha256_hash.hexdigest()
+
+def validate_file_type(file: UploadFile, allowed_types: list):
+    file_extension = file.filename.split(".")[-1].lower()
+    if file_extension not in allowed_types:
+        APIResponse.error(message="Loại file không hợp lệ, chỉ chấp nhận: " + ", ".join(allowed_types), status_code=400)

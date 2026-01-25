@@ -17,7 +17,10 @@ from app.core.common.interceptor import (
 from app.core.db.rag_database import RagBase, rag_engine
 
 # Schemas
-from app.schemas import Document, Embedding, MobilePackage, RagConfig
+from app.models import Document, Embedding, MobilePackage, RagConfig
+
+# API routes
+from app.api.routes import router as api_router
 
 # Setup logger
 logging.basicConfig(level=logging.INFO)
@@ -80,9 +83,10 @@ def get_application() -> FastAPI:
 
 # Khởi tạo app
 app = get_application()
+# Gắn router API
+app.include_router(api_router, prefix="/api/v1")
 
-
-@app.get("/health", tags=["Health Check"])
+@app.get("/system/health", tags=["Health Check"])
 async def root():
     return APIResponse.success(
         message="Server đang hoạt động bình thường",
