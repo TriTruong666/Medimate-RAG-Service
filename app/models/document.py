@@ -13,7 +13,7 @@ class Document(RagBase):
     type = Column(String, nullable=False)  # pdf, docx, txt, json
     status = Column(
         String, default="uploaded"
-    )  # uploaded, indexing, indexed, failed, success
+    )  # uploaded, indexing, indexed, failed, sent
     file_size = Column(Integer, default=0)
     checksum = Column(String, nullable=False)  # Tránh duplicate
     created_at = Column(DateTime(timezone=True), server_default=func.now())

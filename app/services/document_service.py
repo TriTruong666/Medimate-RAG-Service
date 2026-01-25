@@ -102,7 +102,7 @@ class DocumentService:
         if not doc:
             raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
         
-        if doc.status != "uploaded" or doc.status == "failed":
+        if doc.status == "indexed" or doc.status == "sent":
             raise HTTPException(status_code=400, detail="File này đã học xong rồi")
     
         try:
