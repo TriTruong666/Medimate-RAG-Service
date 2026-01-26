@@ -22,11 +22,19 @@ class Settings(BaseSettings):
 
     RAW_UPLOAD_PATH: str = os.path.join(BASE_DIR, "data", "raw_data")
 
-    CHROMA_DB_DIR: str = os.path.join(BASE_DIR, "app", "data", "chroma_db")
-
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     RAG_DB_URL: str = os.getenv("RAG_DB_URL")
+
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB")
+    
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER")
+
+    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER")
+
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD")
+
+    POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT"))
 
 
 settings = Settings()

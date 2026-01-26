@@ -4,11 +4,8 @@ python-multipart
 llama-index-core
 llama-index-llms-llama-cpp
 llama-index-embeddings-huggingface
-llama-index-vector-stores-chroma
 llama-index-readers-file
-qdrant-client
-llama-index-vector-stores-qdrant
-chromadb
+llama-index-vector-stores-postgres
 pydantic-settings
 python-dotenv
 pypdf
@@ -19,3 +16,4 @@ sqlalchemy
 pgvector
 alembic
 psycopg2-binary
+asyncpg
