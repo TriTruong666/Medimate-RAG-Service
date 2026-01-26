@@ -104,7 +104,9 @@ class DocumentService:
         
         if doc.status == "indexed" or doc.status == "sent":
             raise HTTPException(status_code=400, detail="File này đã học xong rồi")
-    
+
+        if doc.status == "indexing":
+            raise HTTPException(status_code=400, detail="File này đang được xử lý, vui lòng chờ")
         try:
             doc.status = "indexing"
             db.commit()
@@ -190,6 +192,8 @@ class DocumentService:
             db.commit()
             print(f"Error ingest: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+
+
 
 def calculate_file_hash(file: UploadFile) -> str:
     """

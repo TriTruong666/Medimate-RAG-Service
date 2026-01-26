@@ -12,3 +12,6 @@ data
 models_weights
 
 *.gguf
+
+.zencoder
+.zenflow
