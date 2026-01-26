@@ -6,7 +6,6 @@ from app.services.rag_engine import initialize_global_engine
 
 router = APIRouter()
 
-# Biến global lưu engine (để đỡ load lại)
 _global_engine = None
 
 def get_engine(streaming: bool = True):

@@ -42,8 +42,7 @@ class CustomPostgresRetriever(BaseRetriever):
             results = conn.execute(sql).fetchall()
             
             for row in results:
-                # row[0]: id, row[1]: text, row[2]: distance
-                # Cosine Similarity = 1 - Distance
+                # Điểm này là điểm similarity, càng thấp càng giống
                 score = 1.0 - float(row[2])
                 
                 node = TextNode(text=row[1], id_=str(row[0]))

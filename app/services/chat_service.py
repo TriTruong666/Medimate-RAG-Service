@@ -4,48 +4,80 @@ from llama_index.core.base.response.schema import StreamingResponse
 class ChatService:
     @staticmethod
     def chat_stream_generator(query_engine, question: str):
-        """Xử lý Streaming: Trả về từng token"""
+        """Xử lý Streaming: Trả về từng token (Bao cân cả lỗi Non-streaming)"""
         if not query_engine:
-            yield json.dumps({"type": "error", "content": "Engine chưa sẵn sàng"}) + "\n"
+            yield json.dumps({"type": "error", "content": "Engine chưa sẵn sàng"}, ensure_ascii=False) + "\n"
             return
 
         try:
-            streaming_response = query_engine.query(question)
-
-            # 1. Stream Text
-            for token in streaming_response.response_gen:
+            
+            response_obj = query_engine.query(question)
+         
+            if not response_obj.source_nodes or str(response_obj).strip() == "Empty Response":
+                fallback_msg = "Xin lỗi, dữ liệu hiện tại của tôi không có thông tin về vấn đề này."
+                # Giả lập streaming trả về câu xin lỗi
+                yield json.dumps({"type": "text", "content": fallback_msg}, ensure_ascii=False) + "\n"
+                yield ChatService._format_sources([]) + "\n"
+                return
+          
+            if isinstance(response_obj, StreamingResponse):
+                
+                for token in response_obj.response_gen:
+                    data = {
+                        "type": "text", 
+                        "content": token
+                    }
+                    yield json.dumps(data, ensure_ascii=False) + "\n"
+            else:
+               
                 data = {
                     "type": "text", 
-                    "content": token
+                    "content": response_obj.response
                 }
-                yield json.dumps(data) + "\n"
+                yield json.dumps(data, ensure_ascii=False) + "\n"
 
-            # 2. Return Sources (Dùng chung logic extract source)
-            yield ChatService._format_sources(streaming_response.source_nodes) + "\n"
+            yield ChatService._format_sources(response_obj.source_nodes) + "\n"
 
         except Exception as e:
             print(f"Lỗi Chat Stream: {e}")
-            yield json.dumps({"type": "error", "content": str(e)}) + "\n"
+            yield json.dumps({"type": "error", "content": str(e)}, ensure_ascii=False) + "\n"
 
     @staticmethod
     def chat_completion_generator(query_engine, question: str):
-        """Xử lý Non-Streaming: Chờ xong hết rồi trả về 1 cục"""
         if not query_engine:
             yield json.dumps({"type": "error", "content": "Engine chưa sẵn sàng"}) + "\n"
             return
         
         try:
-            # query_engine này được init với streaming=False, nên trả về object Response
-            response = query_engine.query(question)
+           
+            response_obj = query_engine.query(question)
+                       
+            if not response_obj.source_nodes or str(response_obj).strip() == "Empty Response":
+                
+                fallback_message = "Xin lỗi, dữ liệu hiện tại của tôi không có thông tin về vấn đề này."
+                
+                yield json.dumps({
+                    "type": "text", 
+                    "content": fallback_message
+                }, ensure_ascii=False) + "\n"
+                
+                # Trả về source rỗng
+                yield ChatService._format_sources([]) + "\n"
+                return 
+        
+            final_text = ""
+            if hasattr(response_obj, 'response_gen'): 
+                for token in response_obj.response_gen:
+                    final_text += token
+            else:
+                final_text = response_obj.response
 
-            # 1. Return Full Text (Trả về nguyên cục text)
             yield json.dumps({
                 "type": "text",
-                "content": response.response 
-            }) + "\n"
+                "content": final_text 
+            }, ensure_ascii=False) + "\n"
 
-            # 2. Return Sources
-            yield ChatService._format_sources(response.source_nodes) + "\n"
+            yield ChatService._format_sources(response_obj.source_nodes) + "\n"
 
         except Exception as e:
             print(f"Lỗi Chat Completion: {e}")
