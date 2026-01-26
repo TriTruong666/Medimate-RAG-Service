@@ -17,3 +17,4 @@ pgvector
 alembic
 psycopg2-binary
 asyncpg
+pandas

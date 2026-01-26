@@ -15,7 +15,7 @@ class Embedding(RagBase):
         UUID(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), index=True
     )
 
-    content = Column(Text, nullable=False)
+    text = Column(Text, nullable=False)
 
     embedding = Column(Vector(384), nullable=True) 
 

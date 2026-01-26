@@ -160,7 +160,7 @@ class DocumentService:
                 # -- Tạo Record --
                 emb_record = Embedding(
                     document_id=doc.id,
-                    content=node.get_content(),
+                    text=node.get_content(),
                     embedding=vector_data,  # Leaf thì có vector, Cha thì NULL
                     metadata_=node.metadata,
                     
