@@ -17,16 +17,12 @@ def get_engine():
 
 @router.post("/stream", summary="Chat với RAG Engine (Streaming)", tags=["Chat"])
 async def chat_stream(question: str):
-    # 1. Lấy Engine
     engine = get_engine()
     
-    # 2. Tạo Generator (Cái hàm ông vừa viết)
-    # Hàm này trả về 1 cái "vòi nước" (iterator), chưa chạy ngay
     data_generator = ChatService.chat_stream_generator(engine, question)
     
-    # 3. Trả về StreamingResponse
-    # FastAPI sẽ kích hoạt cái vòi nước kia, lấy từng giọt (yield) và bắn về client
+    
     return StreamingResponse(
         data_generator, 
-        media_type="application/x-ndjson" # Định dạng chuẩn cho JSON Streaming
+        media_type="application/x-ndjson" 
     )

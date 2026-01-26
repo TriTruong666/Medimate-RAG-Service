@@ -18,3 +18,4 @@ alembic
 psycopg2-binary
 asyncpg
 pandas
+torch

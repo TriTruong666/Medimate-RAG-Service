@@ -1,4 +1,5 @@
 import os
+import torch
 from llama_index.llms.llama_cpp import LlamaCPP
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from app.core.config import settings
@@ -71,10 +72,13 @@ def get_llm():
 
 def get_embed_model():
     global embed_model
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     if embed_model is None:
         print(f"Loading Embedding Model: {settings.EMBEDDING_MODEL}")
         embed_model = HuggingFaceEmbedding(
+            device=device,
             model_name=settings.EMBEDDING_MODEL,
             cache_folder=os.path.join(os.getcwd(), "app", "models_weights"),
+            embed_batch_size=100
         )
     return embed_model
