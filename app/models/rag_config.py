@@ -21,9 +21,9 @@ class RagConfig(RagBase):
 
     prompt_template = Column(Text)
 
-    query_type = Column(String, default="standard")  # standard, conversational
+    response_type = Column(String, default="standard")  # standard, conversational
 
-    is_custom_retrieve = Column(Boolean, default=True)  # True sử dụng Custom Retriever, False sử dụng API GenAI
+    is_use_api = Column(Boolean, default=True)  # True sử dụng Custom Retriever, False sử dụng API GenAI
 
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

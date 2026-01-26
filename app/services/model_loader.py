@@ -28,26 +28,32 @@ def completion_to_prompt(completion):
     return f"<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
 
 
-def get_llm(db: Session):
+def get_llm(db: Session = None):
     global llm
-    config = RagConfigService.get_rag_config(db)
-    if llm is None:
-        print(f"Loading LLM from: {config.llm_model}")
+    if llm is not None:
+        return llm
+    
+    # Nếu lần đầu load mà không có DB thì tạch
+    if db is None:
+        raise Exception("LLM chưa được khởi tạo. Cần truyền Session DB cho lần đầu!")
 
-        llm = LlamaCPP(
-            model_path=config.llm_model,
-            temperature=config.temperature,  # Giảm sáng tạo xuống thấp để trả lời đúng trọng tâm
-            max_new_tokens=config.max_tokens,  # Giới hạn độ dài câu trả lời (tránh viết sớ)
-            context_window=config.context_window,  # Độ dài ngữ cảnh nhớ được(máy mạnh cứ nhân đôi lên)
-            generate_kwargs={
-                "repeat_penalty": 1.1,
-                "top_p": 0.9,
-                "stop": ["<|im_end|>", "User:"],
-            },
-            messages_to_prompt=messages_to_prompt,
-            completion_to_prompt=completion_to_prompt,
-            verbose=False,
-        )
+    config = RagConfigService.get_rag_config(db)
+    print(f"Loading LLM from: {config.llm_model}")
+
+    llm = LlamaCPP(
+        model_path=config.llm_model,
+        temperature=config.temperature,
+        max_new_tokens=getattr(config, 'max_tokens', 512), # Dùng getattr phòng hờ field name khác
+        context_window=getattr(config, 'context_window', 4096),
+        generate_kwargs={
+            "repeat_penalty": 1.1,
+            "top_p": 0.9,
+            "stop": ["<|im_end|>", "User:"],
+        },
+        messages_to_prompt=messages_to_prompt,
+        completion_to_prompt=completion_to_prompt,
+        verbose=False,
+    )
     return llm
 
 _embed_model = None
