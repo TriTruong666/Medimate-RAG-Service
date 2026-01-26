@@ -9,37 +9,20 @@ embed_model = None
 
 
 def messages_to_prompt(messages):
-
-    prompt = (
-        "<|im_start|>system\n"
-        "You are a English AI assistant.. "
-        "Your primary language is English. "
-        "Even if the document or question is in Vietnamese, you MUST answer in English.. "
-        "Explain detail by English.\n"
-        "They will call you Meditate AI and you are helpful and friendly.\n"
-        "STRICTLY FOLLOW THESE RULES:\n"
-        "1. You must answer the question based ONLY on the provided context below.\n"
-        "2. Do NOT use your prior knowledge or external information.\n"
-        "3. If the answer is not in the context, say: 'My data does not contain information about this issue.'.\n"
-        "4. PRESENTATION GUIDELINES (Markdown must be used):\n"
-        "- Use headings, subheadings, bullet points, and numbered lists where appropriate to enhance readability.\n"
-        "- Use **bold** and *italic* text to emphasize key points.\n"
-        "- Include code snippets within triple backticks for clarity.\n"
-        "<|im_end|>\n"
-    )
-    # ----------------------
-
+    prompt = "" 
     for message in messages:
         if message.role == "system":
-            continue
+            prompt += f"<|im_start|>system\n{message.content}<|im_end|>\n"
         elif message.role == "user":
             prompt += f"<|im_start|>user\n{message.content}<|im_end|>\n"
         elif message.role == "assistant":
             prompt += f"<|im_start|>assistant\n{message.content}<|im_end|>\n"
 
-    prompt += "<|im_start|>assistant\n"
-    return prompt
+    # Đảm bảo kết thúc để AI biết đến lượt nó nói
+    if not prompt.endswith("<|im_start|>assistant\n"):
+        prompt += "<|im_start|>assistant\n"
 
+    return prompt
 
 def completion_to_prompt(completion):
     return f"<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
