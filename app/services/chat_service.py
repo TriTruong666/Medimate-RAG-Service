@@ -81,3 +81,9 @@ class ChatService:
             "type": "source",
             "data": formatted_sources
         })
+
+
+"""
+Nhớ tắt các print debug trước khi deploy nhé!
+ensure_ascii=True để tránh lỗi mã hóa tiếng Việt trong JSON
+"""

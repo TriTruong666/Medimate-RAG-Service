@@ -2,8 +2,11 @@ import sys
 import os
 import logging
 import uvicorn
+from contextlib import asynccontextmanager
 from sqlalchemy import text
+from app.core.db.rag_database import SessionLocal
 from fastapi import FastAPI
+from app.services.rag_config_service import RagConfigService
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from fastapi.exceptions import RequestValidationError
@@ -47,6 +50,14 @@ def print_banner():
     """
     print(logo)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = SessionLocal()
+    try:
+        RagConfigService.seed_config(db)
+    finally:
+        db.close()
+    yield
 
 def get_application() -> FastAPI:
     # Config app
@@ -54,6 +65,7 @@ def get_application() -> FastAPI:
         title=f"Medimate RAG Services - {settings.AUTHOR_NAME}",
         version=settings.APP_VERSION,
         docs_url="/docs",
+        lifespan=lifespan,
     )
     # Config CORS
     app.add_middleware(

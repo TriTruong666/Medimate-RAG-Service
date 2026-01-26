@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, status, Query
 from sqlalchemy.orm import Session
 from app.core.db.rag_database import get_db
-from app.services import DocumentService
+from app.services.document_service import DocumentService
 from app.core.common.interceptor import APIResponse
 from typing import Optional
 
@@ -16,6 +16,17 @@ async def upload_document(
         data=result["data"],
         message=result["message"],
         status_code=status.HTTP_201_CREATED,
+    )
+
+@router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
+async def process_document(
+    document_id: str,
+    db: Session = Depends(get_db)
+):
+    result = DocumentService.process_document(db, document_id)
+    return APIResponse.success(
+        message=result["message"],
+        data=None
     )
 
 @router.get("/", status_code=status.HTTP_200_OK, summary="Lấy danh sách tài liệu", tags=["Documents"])
@@ -43,12 +54,13 @@ async def get_document(
         data=result
     )
 
-@router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
-async def process_document(
+
+@router.delete("/{document_id}", status_code=status.HTTP_200_OK, summary="Xoá tài liệu (bao gồm dữ liệu đã embedded)", tags=["Documents"])
+async def delete_document(
     document_id: str,
     db: Session = Depends(get_db)
 ):
-    result = DocumentService.process_document(db, document_id)
+    result = DocumentService.delete_document(db, document_id)
     return APIResponse.success(
         message=result["message"],
         data=None

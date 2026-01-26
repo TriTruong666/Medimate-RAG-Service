@@ -8,6 +8,9 @@ from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.schema import NodeWithScore, TextNode
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.callbacks import CallbackManager
+from sqlalchemy.orm import Session
+from app.services.rag_config_service import RagConfigService
+
 
 from app.services.model_loader import get_llm, get_embed_model
 from app.core.config import settings
@@ -50,8 +53,12 @@ class CustomPostgresRetriever(BaseRetriever):
 
         return nodes
 
-def get_engine(streaming: bool = True):
-   
+def get_engine(db: Session = None, streaming: bool = True,):
+    if db is None:
+        raise Exception("Embed model chưa được khởi tạo. Cần truyền Session DB cho lần khởi tạo đầu tiên!")
+
+    config = RagConfigService.get_rag_config(db)
+
     connection_string = settings.RAG_DB_URL
     
     retriever = CustomPostgresRetriever(
@@ -60,17 +67,8 @@ def get_engine(streaming: bool = True):
         top_k=5
     )
 
-    qa_prompt_str = (
-        "Dựa vào thông tin ngữ cảnh bên dưới, hãy trả lời câu hỏi bằng Tiếng Việt.\n"
-        "Nếu thông tin không có trong ngữ cảnh, hãy nói 'Tôi không tìm thấy thông tin'.\n"
-        "---------------------\n"
-        "Ngữ cảnh:\n"
-        "{context_str}\n"
-        "---------------------\n"
-        "Câu hỏi: {query_str}\n"
-        "Trả lời:"
-    )
-    text_qa_template = PromptTemplate(qa_prompt_str)
+    
+    text_qa_template = PromptTemplate(config.prompt_template)
 
   
     query_engine = RetrieverQueryEngine.from_args(

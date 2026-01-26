@@ -4,18 +4,18 @@ import shutil
 from sqlalchemy import desc
 from fastapi import UploadFile, HTTPException
 from app.core.config import settings
+from app.services.model_loader import get_embed_model
 from sqlalchemy.orm import Session
 from app.models import Document, Embedding
 from app.schemas.document import DocumentResponse
 from app.services.file_service import process_file_in_memory
 from llama_index.core.node_parser import HierarchicalNodeParser, get_leaf_nodes
 from llama_index.core.schema import NodeRelationship
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
 class DocumentService:
     file_types = ["pdf", "docx", "txt", "text", "doc", "json"]
     _chunk_sizes = [2048, 512, 128]
     _node_parser = HierarchicalNodeParser.from_defaults(chunk_sizes=_chunk_sizes)
-    _embed_model = HuggingFaceEmbedding(model_name=settings.EMBEDDING_MODEL)
     @staticmethod
     def save_upload_file(db: Session, file: UploadFile, filename: str):
         file_extension = file.filename.split(".")[-1].lower()
@@ -99,6 +99,7 @@ class DocumentService:
     @staticmethod
     def process_document(db: Session, document_id: int):
         doc = db.query(Document).filter(Document.id == document_id).first()
+        embed_model = get_embed_model(db)
         if not doc:
             raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
         
@@ -146,7 +147,7 @@ class DocumentService:
                 vector_data = None
                 if is_leaf:
                     # Đây là đoạn "Đang tính toán Vector..." trong code cũ
-                    vector_data = DocumentService._embed_model.get_text_embedding(node.get_content())
+                    vector_data = embed_model.get_text_embedding(node.get_content())
                 
                 # -- Xác định Level (Mẹo: dựa vào độ dài text hoặc chunk size) --
                 # Level 0 = Leaf (nhỏ nhất), Level càng cao càng to
@@ -203,7 +204,31 @@ class DocumentService:
         new_doc = DocumentResponse.model_validate(doc)
 
         return new_doc
-        
+
+    def delete_document(db: Session, document_id: str):
+        try:
+            
+            doc = db.query(Document).filter(Document.id == document_id).first()
+            if not doc:
+                raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
+
+            
+            if os.path.exists(doc.file_path):
+                try:
+                    os.remove(doc.file_path)
+                    
+                except Exception as e:
+                    print(f"--- Lỗi khi xoá file vật lý: {e}")
+                    
+            db.delete(doc)
+            db.commit()
+            
+            return {"message": "Xoá tài liệu thành công"}
+
+        except Exception as e:
+            db.rollback()
+            print(f"Lỗi khi xoá tài liệu: {e}")
+            raise e        
 
 def calculate_file_hash(file: UploadFile) -> str:
     """
