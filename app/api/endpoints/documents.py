@@ -32,6 +32,17 @@ async def list_documents(
         data=result
     )
 
+@router.get("/{document_id}", status_code=status.HTTP_200_OK, summary="Lấy thông tin tài liệu", tags=["Documents"])
+async def get_document(
+    document_id: str,
+    db: Session = Depends(get_db)
+):
+    result = DocumentService.get_document_by_id(db, document_id)
+    return APIResponse.success(
+        message="Lấy thông tin tài liệu thành công",
+        data=result
+    )
+
 @router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
 async def process_document(
     document_id: str,

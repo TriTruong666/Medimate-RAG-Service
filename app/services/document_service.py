@@ -193,7 +193,17 @@ class DocumentService:
             print(f"Error ingest: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    @staticmethod
+    def get_document_by_id(db: Session, document_id: int):
+        doc = db.query(Document).filter(Document.id == document_id).first()
 
+        if not doc:
+            raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
+        
+        new_doc = DocumentResponse.model_validate(doc)
+
+        return new_doc
+        
 
 def calculate_file_hash(file: UploadFile) -> str:
     """

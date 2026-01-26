@@ -6,7 +6,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# Setup logger để ghi lại lỗi hệ thống (nếu có)
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -44,7 +43,6 @@ class APIResponse:
         )
 
 
-# --- CÁC HANDLER ĐỂ INTERCEPT LỖI TỰ ĐỘNG ---
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):

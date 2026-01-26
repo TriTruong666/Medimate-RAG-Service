@@ -15,12 +15,11 @@ def get_engine():
         _global_engine = initialize_global_engine()
     return _global_engine
 
-@router.post("/stream", summary="Chat với RAG Engine (Streaming)", tags=["Chat"])
+@router.post("/stream", summary="Chat với Model LLM", tags=["Chat"])
 async def chat_stream(question: str):
     engine = get_engine()
     
     data_generator = ChatService.chat_stream_generator(engine, question)
-    
     
     return StreamingResponse(
         data_generator, 
