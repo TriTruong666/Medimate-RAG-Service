@@ -1,68 +1,76 @@
 import sys
 import os
+import json
 from sqlalchemy import create_engine, text
 
-# Hack đường dẫn để import được app
+# Setup đường dẫn
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 sys.path.append(project_root)
 
 from app.core.config import settings
+from app.services.model_loader import get_embed_model
 
-def debug_database():
-    print("--- BẮT ĐẦU DEBUG DATABASE ---")
+def debug_raw_sql():
+    print("🚀 BẮT ĐẦU DEBUG RAW SQL...")
     
-    # 1. Tạo kết nối (Connection String)
-    # Lấy thông tin từ file config của ông
+    # 1. Tạo vector mẫu từ Model thật
+    print("1. Đang tạo embedding mẫu cho từ khóa 'HTTPS'...")
+    embed_model = get_embed_model()
+    query_vector = embed_model.get_text_embedding("Giai đoạn 1")
+    
+    # Convert vector thành chuỗi format của Postgres: '[0.1, 0.2, ...]'
+    vector_str = str(query_vector)
+    
+    # 2. Kết nối DB
     db_url = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
-    print(f"1. Đang kết nối tới: {settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT} DB: {settings.POSTGRES_DB}")
+    engine = create_engine(db_url)
     
-    try:
-        engine = create_engine(db_url)
-        with engine.connect() as conn:
-            print("   ✅ Kết nối thành công!")
+    with engine.connect() as conn:
+        print("\n2. KIỂM TRA KIỂU DỮ LIỆU CỘT EMBEDDING...")
+        # Check xem cột embedding là kiểu 'vector' hay 'double precision[]'
+        type_check = conn.execute(text("""
+            SELECT udt_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'embeddings' AND column_name = 'embedding'
+        """)).scalar()
+        
+        print(f"👉 Kiểu dữ liệu trong DB là: '{type_check}'")
+        
+        if type_check != 'vector':
+            print("❌ LỖI CHÍ MẠNG: Cột embedding KHÔNG PHẢI kiểu vector!")
+            print("   -> Nó đang là mảng thường. PGVector không search được trên cái này.")
+            print("   -> Giải pháp: Phải Drop bảng và chạy lại từ đầu với extension vector được bật.")
+            return
 
-            # 2. Liệt kê tất cả các bảng hiện có trong DB
-            print("\n2. Kiểm tra danh sách bảng (Tables):")
-            result = conn.execute(text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"))
-            tables = [row[0] for row in result]
+        print("\n3. THỰC HIỆN SEARCH BẰNG SQL THUẦN (Toán tử <=>)")
+        try:
+            # Câu lệnh SQL tìm kiếm vector gần nhất (Cosine Distance)
+            # Lấy 3 thằng gần nhất
+            sql = text(f"""
+                SELECT text, (embedding <=> '{vector_str}') as distance
+                FROM embeddings
+                WHERE embedding IS NOT NULL
+                ORDER BY distance ASC
+                LIMIT 3;
+            """)
             
-            if not tables:
-                print("   ❌ CẢNH BÁO: Không tìm thấy bảng nào trong schema 'public'!")
+            results = conn.execute(sql).fetchall()
+            
+            if not results:
+                print("❌ KẾT QUẢ: 0 dòng. (Vô lý vì bảng có dữ liệu!)")
             else:
-                for t in tables:
-                    print(f"   - {t}")
+                print(f"✅ KẾT QUẢ: Tìm thấy {len(results)} dòng tương đồng!")
+                for idx, row in enumerate(results):
+                    print(f"   Top {idx+1}: Distance = {row[1]:.4f}")
+                    print(f"   Content: {row[0][:100]}...")
+                    
+                print("\n✅ KẾT LUẬN: Database và Vector NGON LÀNH.")
+                print("   -> Lỗi nằm ở cách LlamaIndex khởi tạo connection.")
 
-            # 3. Kiểm tra dữ liệu trong bảng 'embeddings' (hoặc tên bảng ông nghi ngờ)
-            target_table = "embeddings" # <--- Tên bảng ông định dùng
-            
-            if target_table in tables:
-                count_query = text(f"SELECT count(*) FROM {target_table}")
-                count = conn.execute(count_query).scalar()
-                print(f"\n3. Soi bảng '{target_table}':")
-                print(f"   -> Tổng số dòng: {count}")
-                
-                if count > 0:
-                    # Soi thử 1 dòng xem vector có null không
-                    sample = conn.execute(text(f"SELECT id, content, embedding FROM {target_table} LIMIT 1")).first()
-                    print(f"   -> Sample Content: {sample[1][:50]}...")
-                    if sample[2] is None:
-                        print("   ❌ CẢNH BÁO: Cột vector (embedding) đang bị NULL! (Lỗi lúc ingest)")
-                    else:
-                        print(f"   ✅ Vector OK. Độ dài vector: {len(sample[2]) if hasattr(sample[2], '__len__') else 'Unknown'}")
-                        # all-MiniLM-L6-v2 phải là 384 dimensions
-                else:
-                    print("   ❌ Bảng có tồn tại nhưng RỖNG (0 dòng). Ông chưa Ingest thành công!")
-            
-            # 4. Kiểm tra xem có bảng 'data_embeddings' (tên mặc định của LlamaIndex) không
-            elif "data_embeddings" in tables:
-                print(f"\n❌ Ông đang lưu nhầm vào bảng 'data_embeddings' rồi, trong khi code lại tìm 'embeddings'!")
-            
-            else:
-                print(f"\n❌ Không tìm thấy bảng '{target_table}' đâu cả. Ông đã chạy Ingest chưa?")
-
-    except Exception as e:
-        print(f"\n❌ Lỗi kết nối chết người: {e}")
+        except Exception as e:
+            print(f"❌ LỖI SQL EXECUTION: {e}")
+            print("   -> Có thể chưa cài extension vector? Chạy 'CREATE EXTENSION vector;' trong DB xem.")
 
 if __name__ == "__main__":
-    debug_database()
+    debug_raw_sql()

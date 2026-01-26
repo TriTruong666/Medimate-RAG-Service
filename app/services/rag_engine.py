@@ -1,75 +1,96 @@
-from llama_index.core import VectorStoreIndex, StorageContext, PromptTemplate
-from llama_index.core.retrievers import AutoMergingRetriever
+import sys
+import logging
+from typing import List
+from sqlalchemy import create_engine, text
+
+from llama_index.core import PromptTemplate
+from llama_index.core.retrievers import BaseRetriever
+from llama_index.core.schema import NodeWithScore, TextNode
 from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.vector_stores.postgres import PGVectorStore
+from llama_index.core.callbacks import CallbackManager
+
 from app.services.model_loader import get_llm, get_embed_model
 from app.core.config import settings
 
-def get_hierarchical_query_engine(index):
-    if index is None:
-        return None
+# Setup Logging
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
-    base_retriever = index.as_retriever(similarity_top_k=5)
+# --- CLASS TỰ CHẾ: CHẠY SQL TRỰC TIẾP ---
+class CustomPostgresRetriever(BaseRetriever):
+    def __init__(self, connection_string: str, embed_model, top_k: int = 5):
+        self._engine = create_engine(connection_string)
+        self._embed_model = embed_model
+        self._top_k = top_k
+        super().__init__()
 
-    retriever = AutoMergingRetriever(
-        base_retriever,
-        storage_context=index.storage_context,
-        verbose=True,   # Tắt khi lên prod
+    def _retrieve(self, query_bundle) -> List[NodeWithScore]:
+        query_str = query_bundle.query_str
+        
+        # 1. Embed câu hỏi
+        query_embedding = self._embed_model.get_text_embedding(query_str)
+        
+        # Convert vector sang dạng string cho Postgres: '[0.1, 0.2, ...]'
+        vector_str = str(query_embedding)
+
+        # 2. Chạy SQL Thuần (Đã chứng minh là chạy ngon)
+        # Lưu ý: Sửa 'text' thành tên cột đúng trong DB của ông nếu khác
+        sql = text(f"""
+            SELECT id, text, (embedding <=> '{vector_str}') as distance
+            FROM embeddings
+            WHERE embedding IS NOT NULL
+            ORDER BY distance ASC
+            LIMIT {self._top_k};
+        """)
+
+        nodes = []
+        with self._engine.connect() as conn:
+            results = conn.execute(sql).fetchall()
+            
+            for row in results:
+                # row[0]: id, row[1]: text, row[2]: distance
+                # Cosine Similarity = 1 - Distance
+                score = 1.0 - float(row[2])
+                
+                # Tạo Node object để LlamaIndex hiểu
+                node = TextNode(text=row[1], id_=str(row[0]))
+                nodes.append(NodeWithScore(node=node, score=score))
+
+        return nodes
+
+def get_engine():
+    # 1. Setup Connection
+    connection_string = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
+    
+    # 2. Khởi tạo Custom Retriever (Không dùng Index của LlamaIndex nữa)
+    retriever = CustomPostgresRetriever(
+        connection_string=connection_string,
+        embed_model=get_embed_model(),
+        top_k=5
     )
 
+    # 3. Setup Prompt (Bắt buộc có để tránh lỗi Empty Response)
     qa_prompt_str = (
         "<|im_start|>system\n"
-        "You are an AI assistant named Medimate AI. Your primary language is English.\n"
-        "Even if the document or question is in Vietnamese, you MUST answer in English.\n"
-        "STRICTLY FOLLOW THESE RULES:\n"
-        "1. Answer based ONLY on the context provided below.\n"
-        "2. Do NOT use outside knowledge.\n"
-        "3. If the answer is not in the context, say: 'My data does not contain information about this issue.'\n"
-        "4. Use Markdown (bold, lists, code blocks) for clarity.\n"
+        "You are a helpful assistant. Answer strictly based on the context below.\n"
         "<|im_end|>\n"
         "<|im_start|>user\n"
-        "Context information is below.\n"
-        "---------------------\n"
-        "{context_str}\n"  # <--- CHỖ NÀY ĐỂ NHÉT DỮ LIỆU TÌM ĐƯỢC
-        "---------------------\n"
-        "Given the context information and not prior knowledge, answer the query.\n"
-        "Query: {query_str}\n" # <--- CHỖ NÀY ĐỂ NHÉT CÂU HỎI
+        "Context:\n{context_str}\n\n"
+        "Question: {query_str}\n"
         "<|im_end|>\n"
         "<|im_start|>assistant\n"
     )
-    
-    # Bọc trong class PromptTemplate
     text_qa_template = PromptTemplate(qa_prompt_str)
-    
+
+    # 4. Tạo Engine
     query_engine = RetrieverQueryEngine.from_args(
-        retriever,
+        retriever=retriever,
         llm=get_llm(),
         text_qa_template=text_qa_template,
-        streaming=True,
+        streaming=True
     )
 
     return query_engine
 
+# Hàm này để tương thích với code gọi cũ của ông
 def initialize_global_engine():
-
-    vector_store = PGVectorStore.from_params(
-        database=settings.POSTGRES_DB,
-        host=settings.POSTGRES_SERVER,
-        password=settings.POSTGRES_PASSWORD,
-        port=settings.POSTGRES_PORT,
-        user=settings.POSTGRES_USER,
-        
-        table_name="embeddings",
-        embed_dim=384,
-        
-        
-    )
-    
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    index = VectorStoreIndex.from_vector_store(
-        vector_store=vector_store,
-        storage_context=storage_context,
-        embed_model=get_embed_model()
-    )
-    
-    return get_hierarchical_query_engine(index)
+    return get_engine()

@@ -2,6 +2,7 @@ import sys
 import os
 import json
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 # Setup đường dẫn
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -46,16 +47,26 @@ def final_diagnosis():
 
     print("\n========== 2. KIỂM TRA RETRIEVAL (LlamaIndex) ==========")
     try:
-        # Giả lập y hệt config API
-        vector_store = PGVectorStore.from_params(
-            database=settings.POSTGRES_DB,
-            host=settings.POSTGRES_SERVER,
-            password=settings.POSTGRES_PASSWORD,
-            port=settings.POSTGRES_PORT,
-            user=settings.POSTGRES_USER,
-            table_name="embeddings",
-            embed_dim=384, # MiniLM
-        )
+        url = make_url(
+        f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
+        f"@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
+    )
+
+    # 2. Khởi tạo PGVectorStore TRỰC TIẾP (Bỏ qua from_params)
+    # Lúc này ông muốn truyền tham số trời biển gì cũng được
+        vector_store = PGVectorStore(
+        connection_string=str(url),
+        async_connection_string=str(url).replace("postgresql://", "postgresql+asyncpg://"),
+        
+        table_name="embeddings",
+        schema_name="public",
+        
+        embed_dim=384,  # Khớp với model MiniLM
+        
+        # QUAN TRỌNG: Gọi trực tiếp thì khai báo được text_key
+        # Dù ông đã đổi tên cột thành 'text' rồi, nhưng khai báo rõ ràng vẫn tốt hơn
+        text_key="text",      
+    )
         
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         index = VectorStoreIndex.from_vector_store(
