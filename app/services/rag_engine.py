@@ -61,29 +61,14 @@ def get_engine(streaming: bool = True):
     )
 
     qa_prompt_str = (
-        "<|im_start|>system\n"
-        "You are a helpful and friendly AI assistant named Medimate AI.\n"
-        "Your primary objective is to assist users by answering their questions in **Vietnamese**.\n"
-        "Please provide clear, concise, detail and accurate responses based on the context provided below."
-        "\n"
-        "STRICTLY FOLLOW THESE RULES:\n"
-        "1. **Language**: You MUST answer in **Vietnamese**, regardless of whether the context or the user's question is in English.\n"
-        "2. **Grounding**: Answer the question based **ONLY** on the provided context below. Do NOT use your prior knowledge or external information.\n"
-        "3. **Missing Info**: If the answer is NOT in the context, you must strictly reply: 'Xin lỗi, dữ liệu hiện tại của tôi không có thông tin về vấn đề này.' (Do not try to make up an answer).\n"
-        "4. **Formatting**: Use Markdown to structure your answer:\n"
-        "   - Use **Headings** for sections.\n"
-        "   - Use **Bold** for key terms.\n"
-        "   - Use **Bullet points** for lists.\n"
-        "<|im_end|>\n"
-        "<|im_start|>user\n"
-        "Context information is below.\n"
+        "Dựa vào thông tin ngữ cảnh bên dưới, hãy trả lời câu hỏi bằng Tiếng Việt.\n"
+        "Nếu thông tin không có trong ngữ cảnh, hãy nói 'Tôi không tìm thấy thông tin'.\n"
         "---------------------\n"
+        "Ngữ cảnh:\n"
         "{context_str}\n"
         "---------------------\n"
-        "Given the context information and not prior knowledge, answer the query in Vietnamese.\n"
-        "Query: {query_str}\n"
-        "<|im_end|>\n"
-        "<|im_start|>assistant\n"
+        "Câu hỏi: {query_str}\n"
+        "Trả lời:"
     )
     text_qa_template = PromptTemplate(qa_prompt_str)
 
