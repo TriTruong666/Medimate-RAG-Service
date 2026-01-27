@@ -57,22 +57,21 @@ class CustomPostgresRetriever(BaseRetriever):
 
 def get_engine(db, streaming: bool = True):
     if db is None:
-        # Dòng này thực ra sẽ không bao giờ chạy tới nếu gọi từ initialize_global_engine
         raise Exception("Session DB không được để trống!")
 
-    # 1. Lấy config từ DB
+    
     config = RagConfigService.get_rag_config(db)
 
     connection_string = settings.RAG_DB_URL
     
-    # 2. QUAN TRỌNG: Truyền db vào get_embed_model và get_llm
-    embed_model = get_embed_model(db) # <--- Sửa ở đây
-    llm_model = get_llm(db) # Nếu hàm get_llm của ông cũng cần config từ DB thì truyền db vào luôn
+    
+    embed_model = get_embed_model(db) 
+    llm_model = get_llm(db) 
     
     retriever = CustomPostgresRetriever(
         connection_string=connection_string,
         embed_model=embed_model,
-        top_k=config.top_k # Nên dùng top_k từ DB luôn cho linh hoạt
+        top_k=config.top_k
     )
 
     text_qa_template = PromptTemplate(config.prompt_template)
