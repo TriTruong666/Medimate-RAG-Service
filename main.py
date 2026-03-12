@@ -91,30 +91,30 @@ def main():
 
     # --- KIỂM TRA CUỐI CÙNG ---
     if index is None:
-        print("\n❌ LỖI NGHIÊM TRỌNG: Không có dữ liệu (Index là None).")
+        print("\nLỖI NGHIÊM TRỌNG: Không có dữ liệu (Index là None).")
         print("Vui lòng kiểm tra lại folder 'data' hoặc chọn Option 2 để nạp lại.")
         return
 
     # --- SETUP CHAT ENGINE ---
     qa_template_str = (
-        "Below is contextual information extracted from the document.:\n"
+        "Dưới đây là thông tin ngữ cảnh được trích xuất từ tài liệu:\n"
         "---------------------\n"
         "{context_str}\n"
         "---------------------\n"
-        "Based on the above context, please answer the question: {query_str}\n\n"
-        "Requirements:\n"
-        "- Provide a DETAILED, COMPLETE, and SPECIFIC answer.\n"
-        "- Explain the main points clearly.\n"
-        "- Answer entirely in English.\n"
-        "- If information is missing, say: 'The documentation doesn't have information on this issue.'.\n"
-        "PROHIBITED RULES:\n"
-        "1. Do not use external knowledge.\n"
-        "2. Don't make things up.\n"
-        "3. Use Markdown (Bold, Italic, Lists) for readability.\n"
+        "Dựa trên ngữ cảnh trên, hãy trả lời câu hỏi: {query_str}\n\n"
+        "Yêu cầu thực hiện:\n"
+        "- Cung cấp câu trả lời CHI TIẾT, ĐẦY ĐỦ và CỤ THỂ.\n"
+        "- Giải thích các luận điểm chính một cách rõ ràng, mạch lạc.\n"
+        "- Trả lời hoàn toàn bằng TIẾNG VIỆT.\n"
+        "- Văn phong: TRANG TRỌNG, KHÁCH QUAN và CHÍNH XÁC (phù hợp với tính chất tài liệu chính trị).\n"
+        "- Nếu thông tin không có trong ngữ cảnh, hãy trả lời chính xác là: 'Tài liệu không cung cấp thông tin về vấn đề này.'.\n"
+        "CÁC QUY TẮC CẤM (TUYỆT ĐỐI TUÂN THỦ):\n"
+        "1. KHÔNG sử dụng kiến thức bên ngoài (chỉ dựa vào thông tin được cung cấp ở trên).\n"
+        "2. KHÔNG được tự suy diễn hoặc bịa đặt thông tin sai lệch.\n"
+        "3. Sử dụng định dạng Markdown (In đậm, In nghiêng, Danh sách) để trình bày dễ đọc.\n"
     )
     qa_template = PromptTemplate(qa_template_str)
 
-    # Gọi hàm tạo Engine Mẹ Bồng Con
     query_engine = get_hierarchical_query_engine(index, qa_template)
 
     if query_engine is None:
@@ -127,7 +127,7 @@ def main():
     # --- VÒNG LẶP CHAT ---
     while True:
         try:
-            question = input("\nTao: ")
+            question = input("\nTôi: ")
             if question.lower() in ["exit", "quit", "thoat"]:
                 print("Tạm biệt!")
                 break
