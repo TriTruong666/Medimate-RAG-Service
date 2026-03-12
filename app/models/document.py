@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, func, Integer
+from sqlalchemy import Column, String, DateTime, func, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.db.rag_database import RagBase
 import uuid
@@ -17,3 +17,8 @@ class Document(RagBase):
     file_size = Column(Integer, default=0)
     checksum = Column(String, nullable=False)  # Tránh duplicate
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    collection_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("collections.id", ondelete="SET NULL"), 
+        nullable=True
+    )

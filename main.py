@@ -20,7 +20,7 @@ from app.core.common.interceptor import (
 from app.core.db.rag_database import RagBase, rag_engine
 
 # Schemas
-from app.models import Document, Embedding, RagConfig
+from app.models import Document, Embedding, RagConfig, Collection
 
 # API routes
 from app.api.routes import router as api_router
