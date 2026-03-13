@@ -1,6 +1,7 @@
 import time
 
 from fastapi import APIRouter, Depends
+from app.core.auth.deps import get_current_principal, require_roles
 from app.core.common.interceptor import APIResponse
 from app.core.common.rate_limit import rate_limit_chat_completion
 from app.services.chat_service import ChatService
@@ -51,7 +52,7 @@ async def preload_chat_engine():
 @router.post("/completion", summary="Chat với Model LLM (Non-Streaming)", tags=["Chat"])
 async def chat_completion(
     req: ChatRequest,
-    _: None = Depends(rate_limit_chat_completion),
+    _: None = Depends(rate_limit_chat_completion)
 ):
     quick_reply = ChatService.build_quick_reply(req.question)
     if quick_reply is not None:

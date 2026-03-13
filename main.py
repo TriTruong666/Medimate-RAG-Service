@@ -10,6 +10,7 @@ from app.services.rag_config_service import RagConfigService
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.common.interceptor import (
     http_exception_handler,
@@ -95,6 +96,33 @@ def get_application() -> FastAPI:
 
 # Khởi tạo app
 app = get_application()
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+        description=app.description,
+    )
+
+    components = openapi_schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes["HTTPBearer"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+    }
+
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 # Gắn router API
 app.include_router(api_router, prefix="/api/v1")
 

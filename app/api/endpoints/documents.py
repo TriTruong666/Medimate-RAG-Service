@@ -10,7 +10,7 @@ router = APIRouter()
 @router.post("/upload-document", status_code=status.HTTP_201_CREATED, summary="Upload tài liệu", tags=["Documents"])
 async def upload_document(
     db: Session = Depends(get_db),
-    file: UploadFile = File(...),
+    file: UploadFile = File(...)
 ):
     result = DocumentService.save_upload_file(db, file, file.filename)
     return APIResponse.success(

@@ -2,7 +2,8 @@ import os
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(".env")
+load_dotenv(".env.local", override=True)
 
 BASE_DIR = os.getcwd()
 
@@ -41,5 +42,9 @@ class Settings(BaseSettings):
     DOC_PROCESS_RATE_LIMIT_MAX_REQUESTS: int = int(os.getenv("DOC_PROCESS_RATE_LIMIT_MAX_REQUESTS", "5"))
     DOC_PROCESS_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("DOC_PROCESS_RATE_LIMIT_WINDOW_SECONDS", "60"))
 
+    # Auth service configuration
+    AUTH_PROVIDER: str = os.getenv("AUTH_PROVIDER")
+    AUTH_GRPC_TARGET: str = os.getenv("AUTH_GRPC_TARGET")
+    AUTH_GRPC_TIMEOUT_SECONDS: float = float(os.getenv("AUTH_GRPC_TIMEOUT_SECONDS", "2.0"))
 
 settings = Settings()
