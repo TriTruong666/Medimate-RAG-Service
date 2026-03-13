@@ -36,5 +36,10 @@ class Settings(BaseSettings):
 
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT"))
 
+    CHAT_RATE_LIMIT_MAX_REQUESTS: int = int(os.getenv("CHAT_RATE_LIMIT_MAX_REQUESTS", "10"))
+    CHAT_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("CHAT_RATE_LIMIT_WINDOW_SECONDS", "60"))
+    DOC_PROCESS_RATE_LIMIT_MAX_REQUESTS: int = int(os.getenv("DOC_PROCESS_RATE_LIMIT_MAX_REQUESTS", "5"))
+    DOC_PROCESS_RATE_LIMIT_WINDOW_SECONDS: int = int(os.getenv("DOC_PROCESS_RATE_LIMIT_WINDOW_SECONDS", "60"))
+
 
 settings = Settings()

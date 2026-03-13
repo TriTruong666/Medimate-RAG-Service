@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, status, Query
 from sqlalchemy.orm import Session
+from app.core.common.rate_limit import rate_limit_document_process
 from app.core.db.rag_database import get_db
 from app.services.document_service import DocumentService
 from app.core.common.interceptor import APIResponse
@@ -21,7 +22,8 @@ async def upload_document(
 @router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
 async def process_document(
     document_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_document_process),
 ):
     result = DocumentService.process_document(db, document_id)
     return APIResponse.success(

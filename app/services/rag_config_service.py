@@ -1,11 +1,17 @@
+import logging
+import os
+
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from app.models import RagConfig
-from fastapi import HTTPException
-import os
+from fastapi import HTTPException, status
 
 from app.schemas.rag_config import RagConfigCreate, RagConfigUpdate
 
 BASE_DIR = os.getcwd()
+logger = logging.getLogger(__name__)
+
+
 class RagConfigService:
     @staticmethod
     def list_configs(db: Session):
@@ -23,32 +29,54 @@ class RagConfigService:
 
     @staticmethod
     def create_config(db: Session, payload: RagConfigCreate):
-        config = RagConfig(**payload.model_dump())
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-        return config
+        try:
+            config = RagConfig(**payload.model_dump())
+            db.add(config)
+            db.commit()
+            db.refresh(config)
+            return config
+        except SQLAlchemyError:
+            db.rollback()
+            logger.exception("Lỗi DB khi tạo cấu hình")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi DB khi tạo cấu hình",
+            )
 
     @staticmethod
     def update_config(db: Session, config_id: int, payload: RagConfigUpdate):
         config = RagConfigService.get_config_by_id(db, config_id)
         updated_data = payload.model_dump(exclude_unset=True)
-        if not config:
+
+        if not updated_data:
+            return config
+        try:
+            for field, value in updated_data.items():
+                setattr(config, field, value)
+            db.commit()
+            db.refresh(config)
+            return config
+        except SQLAlchemyError:
+            db.rollback()
+            logger.exception("Lỗi DB khi cập nhật cấu hình")
             raise HTTPException(
-                status_code=404,
-                detail=f"Không tìm thấy cấu hình RAG"
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi DB khi cập nhật cấu hình",
             )
-        for field, value in updated_data.items():
-            setattr(config, field, value)
-        db.commit()
-        db.refresh(config)
-        return config
 
     @staticmethod
     def delete_config(db: Session, config_id: int):
         config = RagConfigService.get_config_by_id(db, config_id)
-        db.delete(config)
-        db.commit()
+        try:
+            db.delete(config)
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            logger.exception("Lỗi DB khi xoá cấu hình")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lỗi DB khi xoá cấu hình",
+            )
 
     
     @staticmethod
@@ -66,7 +94,7 @@ class RagConfigService:
         config = db.query(RagConfig).first()
         
         if not config:
-            print("Bắt đầu seed cấu hình RAG mặc định...")
+            logger.info("Bắt đầu seed cấu hình RAG mặc định...")
             default_config = RagConfig(
                 embedding_model="sentence-transformers/all-MiniLM-L6-v2",
                 llm_model=os.path.join(BASE_DIR, "app", "models_weights", "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
@@ -92,5 +120,5 @@ class RagConfigService:
             db.refresh(default_config)
             return default_config
         
-        print("Cấu hình RAG đã tồn tại, bỏ qua bước seed.")
+        logger.info("Cấu hình RAG đã tồn tại, bỏ qua bước seed.")
         return config

@@ -1,45 +1,64 @@
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse 
+import time
+
+from fastapi import APIRouter, Depends
+from app.core.common.interceptor import APIResponse
+from app.core.common.rate_limit import rate_limit_chat_completion
 from app.services.chat_service import ChatService
 from app.services.rag_engine import initialize_global_engine 
 from app.schemas.chat import ChatRequest
 router = APIRouter()
 
 
-_stream_engine_cache = None
 _completion_engine_cache = None
 
-def get_cached_engine(streaming: bool):
-    global _stream_engine_cache, _completion_engine_cache
-    
-    if streaming:
-        if _stream_engine_cache is None:
-            _stream_engine_cache = initialize_global_engine(streaming=True)
-        return _stream_engine_cache
-    else:
-        if _completion_engine_cache is None:
-            _completion_engine_cache = initialize_global_engine(streaming=False)
-        return _completion_engine_cache
+def get_cached_engine():
+    global _completion_engine_cache
+    if _completion_engine_cache is None:
+        _completion_engine_cache = initialize_global_engine(streaming=False)
+    return _completion_engine_cache
 
 
-@router.post("/stream", summary="Chat với Model LLM (Streaming)", tags=["Chat"])
-async def chat_stream(req: ChatRequest):
-    engine = get_cached_engine(streaming=True)
+@router.post("/preload", summary="Preload Chat Engine", tags=["Chat"])
+async def preload_chat_engine():
+    global _completion_engine_cache
+    was_ready = _completion_engine_cache is not None
+    started_at = time.perf_counter()
 
-    data_generator = ChatService.chat_stream_generator(engine, req.question)
-    
-    return StreamingResponse(
-        data_generator, 
-        media_type="application/x-ndjson" 
+    engine = get_cached_engine()
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+
+    return APIResponse.success(
+        message="Preload engine thành công",
+        data={
+            "was_ready": was_ready,
+            "is_ready": engine is not None,
+            "elapsed_ms": elapsed_ms,
+        },
     )
+
+
+# @router.post("/stream", summary="Chat với Model LLM (Streaming)", tags=["Chat"])
+# async def chat_stream(req: ChatRequest):
+#     engine = get_cached_engine(streaming=True)
+
+#     data_generator = ChatService.chat_stream_generator(engine, req.question)
+    
+#     return StreamingResponse(
+#         data_generator, 
+#         media_type="application/x-ndjson" 
+#     )
 
 @router.post("/completion", summary="Chat với Model LLM (Non-Streaming)", tags=["Chat"])
-async def chat_completion(req: ChatRequest):
-    engine = get_cached_engine(streaming=False)
+async def chat_completion(
+    req: ChatRequest,
+    _: None = Depends(rate_limit_chat_completion),
+):
+    quick_reply = ChatService.build_quick_reply(req.question)
+    if quick_reply is not None:
+        return APIResponse.success(data=quick_reply)
+
+    engine = get_cached_engine()
     
-    data_generator = ChatService.chat_completion_generator(engine, req.question)
+    result = ChatService.chat_completion(engine, req.question)
     
-    return StreamingResponse(
-        data_generator, 
-        media_type="application/x-ndjson" 
-    )
+    return APIResponse.success(data=result)

@@ -29,10 +29,14 @@ class APIResponse:
 
     @staticmethod
     def error(
-        message: str, status_code: int = status.HTTP_400_BAD_REQUEST, errors: Any = None
+        message: str,
+        status_code: int = status.HTTP_400_BAD_REQUEST,
+        errors: Any = None,
+        headers: dict[str, str] | None = None,
     ):
         return JSONResponse(
             status_code=status_code,
+            headers=headers,
             content={
                 "success": False,
                 "code": status_code,
@@ -50,7 +54,29 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     Bắt tất cả các lỗi HTTPException(status_code=...) mà ông raise trong code.
     Ví dụ: raise HTTPException(404, detail="Không tìm thấy file")
     """
-    return APIResponse.error(message=str(exc.detail), status_code=exc.status_code)
+    headers = dict(exc.headers or {})
+    if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS and "Retry-After" not in headers:
+        retry_after = getattr(request.state, "retry_after", None)
+        if retry_after is not None:
+            headers["Retry-After"] = str(retry_after)
+
+    message = str(exc.detail)
+    errors = None
+    if isinstance(exc.detail, dict):
+        message = str(exc.detail.get("message", message))
+        extra_fields = {k: v for k, v in exc.detail.items() if k != "message"}
+        errors = extra_fields or None
+    elif exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        retry_after = getattr(request.state, "retry_after", None)
+        if retry_after is not None:
+            errors = {"retry_after_seconds": retry_after}
+
+    return APIResponse.error(
+        message=message,
+        status_code=exc.status_code,
+        errors=errors,
+        headers=headers or None,
+    )
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
