@@ -46,3 +46,7 @@ def require_roles(allowed_roles: list[str]):
             )
         return principal
     return checker
+
+
+RequireAdmin = Depends(require_roles(["admin"]))
+RequireAdminOrUser = Depends(require_roles(["admin", "user"]))

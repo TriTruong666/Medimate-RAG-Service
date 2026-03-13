@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, UploadFile, File, status, Query
 from sqlalchemy.orm import Session
+from app.core.auth.deps import RequireAdmin, RequireAdminOrUser
 from app.core.common.rate_limit import rate_limit_document_process
 from app.core.db.rag_database import get_db
 from app.services.document_service import DocumentService
@@ -10,7 +11,8 @@ router = APIRouter()
 @router.post("/upload-document", status_code=status.HTTP_201_CREATED, summary="Upload tài liệu", tags=["Documents"])
 async def upload_document(
     db: Session = Depends(get_db),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    _principal=RequireAdmin,
 ):
     result = DocumentService.save_upload_file(db, file, file.filename)
     return APIResponse.success(
@@ -24,6 +26,7 @@ async def process_document(
     document_id: str,
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit_document_process),
+    _principal=RequireAdmin,
 ):
     result = DocumentService.process_document(db, document_id)
     return APIResponse.success(
@@ -36,7 +39,8 @@ async def list_documents(
     page: int = Query(1, ge=1, description="Trang hiện tại"),
     limit: int = Query(10, ge=1, le=100, description="Số lượng mỗi trang"),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo tên tài liệu"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _principal=RequireAdminOrUser,
 ): 
     result = DocumentService.get_list_documents(db, page, limit, q)
 
@@ -48,7 +52,8 @@ async def list_documents(
 @router.get("/{document_id}", status_code=status.HTTP_200_OK, summary="Lấy thông tin tài liệu", tags=["Documents"])
 async def get_document(
     document_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _principal=RequireAdminOrUser,
 ):
     result = DocumentService.get_document_by_id(db, document_id)
     return APIResponse.success(
@@ -60,7 +65,8 @@ async def get_document(
 @router.delete("/{document_id}", status_code=status.HTTP_200_OK, summary="Xoá tài liệu (bao gồm dữ liệu đã embedded)", tags=["Documents"])
 async def delete_document(
     document_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _principal=RequireAdmin,
 ):
     result = DocumentService.delete_document(db, document_id)
     return APIResponse.success(
