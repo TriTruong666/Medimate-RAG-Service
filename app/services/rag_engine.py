@@ -8,19 +8,17 @@ from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.schema import NodeWithScore, TextNode
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.callbacks import CallbackManager
-from app.core.db.rag_database import SessionLocal
+from app.core.db.rag_database import SessionLocal, rag_engine
 from app.services.rag_config_service import RagConfigService
-
-
-from app.services.model_loader import get_llm, get_embed_model
+from app.services.model_loader import get_llm, get_embed_model, get_reranker
 from app.core.config import settings
 
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 class CustomPostgresRetriever(BaseRetriever):
-    def __init__(self, connection_string: str, embed_model, top_k: int = 5):
-        self._engine = create_engine(connection_string)
+    def __init__(self, engine, embed_model, top_k: int = 5):
+        self._engine = engine
         self._embed_model = embed_model
         self._top_k = top_k
         super().__init__()
@@ -32,25 +30,41 @@ class CustomPostgresRetriever(BaseRetriever):
         
         vector_str = str(query_embedding)
 
-        
         sql = text("""
-        SELECT id, text, (embedding <=> :vector) as distance
-        FROM embeddings
-        WHERE embedding IS NOT NULL
-        ORDER BY distance ASC
+        WITH semantic_search AS (
+            SELECT id, text, metadata, (1.0 - (embedding <=> :vector)) AS semantic_score
+            FROM embeddings
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> :vector
+            LIMIT :limit
+        ),
+        keyword_search AS (
+            SELECT id, text, metadata, ts_rank(fts_vector, websearch_to_tsquery('simple', :query)) AS keyword_score
+            FROM embeddings
+            WHERE fts_vector @@ websearch_to_tsquery('simple', :query)
+            ORDER BY keyword_score DESC
+            LIMIT :limit
+        )
+        SELECT 
+            COALESCE(s.id, k.id) AS id,
+            COALESCE(s.text, k.text) AS text,
+            COALESCE(s.metadata, k.metadata) AS metadata,
+            (COALESCE(s.semantic_score, 0.0) * 0.7 + COALESCE(k.keyword_score, 0.0) * 0.3) AS combined_score
+        FROM semantic_search s
+        FULL OUTER JOIN keyword_search k ON s.id = k.id
+        ORDER BY combined_score DESC
         LIMIT :limit;
         """)
 
-        
         nodes = []
         with self._engine.connect() as conn:
-            results = conn.execute(sql, {"vector": vector_str, "limit": self._top_k}).fetchall()
+            results = conn.execute(sql, {"vector": vector_str, "limit": self._top_k, "query": query_str}).fetchall()
             
             for row in results:
-                # Điểm này là điểm similarity, càng thấp càng giống
-                score = 1.0 - float(row[2])
-                
-                node = TextNode(text=row[1], id_=str(row[0]))
+                score = float(row[3])
+                # Đưa thêm metadata vào text node
+                node_metadata = row[2] if isinstance(row[2], dict) else {}
+                node = TextNode(text=row[1], id_=str(row[0]), metadata=node_metadata)
                 nodes.append(NodeWithScore(node=node, score=score))
 
         return nodes
@@ -67,18 +81,23 @@ def get_engine(db, streaming: bool = True):
     
     embed_model = get_embed_model(db) 
     llm_model = get_llm(db) 
+    reranker = get_reranker(db)
     
+    # Lấy thêm để reranker có dữ liệu lọc (Top 10 -> Reranker -> Top 5)
     retriever = CustomPostgresRetriever(
-        connection_string=connection_string,
+        engine=rag_engine,
         embed_model=embed_model,
-        top_k=config.top_k
+        top_k=config.top_k + 5 
     )
 
-    text_qa_template = PromptTemplate(config.prompt_template)
+    # Wrap prompt để yêu cầu Citation bắt buộc
+    citation_wrapper = config.prompt_template + "\n\nQUY TẮC BẮT BUỘC:\n- Bạn phải trích dẫn nguồn cho toàn bộ thông tin.\n- Sử dụng định dạng: [Nguồn: <tên tài liệu>]."
+    text_qa_template = PromptTemplate(citation_wrapper)
 
     query_engine = RetrieverQueryEngine.from_args(
         retriever=retriever,
         llm=llm_model,
+        node_postprocessors=[reranker],
         text_qa_template=text_qa_template,
         streaming=streaming
     )

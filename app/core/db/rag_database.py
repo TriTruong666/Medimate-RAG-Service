@@ -17,3 +17,11 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def setup_database():
+    from sqlalchemy import text
+    with rag_engine.connect() as conn:
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_embeddings_embedding_hnsw ON embeddings USING hnsw (embedding vector_cosine_ops);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_embeddings_fts_vector_gin ON embeddings USING GIN (fts_vector);"))
+        conn.commit()

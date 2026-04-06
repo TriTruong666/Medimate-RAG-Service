@@ -1,4 +1,5 @@
 import json
+import time
 from llama_index.core.base.response.schema import StreamingResponse
 
 class ChatService:
@@ -9,9 +10,13 @@ class ChatService:
             return
 
         try:
+            start_time = time.time()
+            print(f"\n[{time.strftime('%X')}] [STREAM] Bắt đầu truy xuất RAG & LLM cho câu hỏi: '{question}' ...")
            
             response_obj = query_engine.query(question)
             
+            rag_time = time.time() - start_time
+            print(f"[{time.strftime('%X')}] [STREAM] Truy xuất xong! Bắt đầu trả kết quả (Thời gian RAG: {rag_time:.2f}s)")
           
             if hasattr(response_obj, "response_gen"):
                
@@ -23,8 +28,8 @@ class ChatService:
                 content = getattr(response_obj, "response", str(response_obj))
                 yield json.dumps({"type": "text", "content": content}, ensure_ascii=False) + "\n"
 
-            source_data = ChatService._format_sources(response_obj.source_nodes)
-            yield source_data.strip() + "\n"
+            total_time = time.time() - start_time
+            print(f"[{time.strftime('%X')}] [STREAM] Hoàn thành luồng stream. Tổng thời gian: {total_time:.2f}s\n")
 
         except Exception as e:
             print(f"Lỗi Stream: {e}")
@@ -37,24 +42,24 @@ class ChatService:
             return
         
         try:
-            response_obj = query_engine.query(question)
-            final_text = ""
+            start_time = time.time()
+            print(f"\n[{time.strftime('%X')}] [COMPLETION] Bắt đầu xử lý câu hỏi: '{question}' ...")
             
-            if hasattr(response_obj, 'response_gen'):
-                for token in response_obj.response_gen:
-                    final_text += token
-            else:             
-                final_text = response_obj.response or ""
-
+            # Cho phép lấy thẳng response (nhanh hơn loop generator)
+            response_obj = query_engine.query(question)
+            
+            final_text = str(response_obj.response) if hasattr(response_obj, 'response') else str(response_obj)
+            
             if not final_text.strip() or final_text.strip() == "Empty Response":
-                final_text = "Xin lỗi, tôi tìm thấy tài liệu liên quan nhưng không thể tổng hợp câu trả lời (Lỗi Model). Dưới đây là các nguồn tham khảo:"
+                final_text = "Xin lỗi, tôi tìm thấy tài liệu liên quan nhưng không thể tổng hợp câu trả lời."
 
             yield json.dumps({
                 "type": "text",
                 "content": final_text 
             }, ensure_ascii=False) + "\n"
 
-            yield ChatService._format_sources(response_obj.source_nodes) + "\n"
+            total_time = time.time() - start_time
+            print(f"[{time.strftime('%X')}] [COMPLETION] Hoàn thành câu trả lời. Tổng thời gian: {total_time:.2f}s\n")
 
         except Exception as e:
             print(f"Lỗi Completion: {e}")
