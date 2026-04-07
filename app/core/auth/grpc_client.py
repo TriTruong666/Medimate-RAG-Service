@@ -12,6 +12,8 @@ class GrpcAuthClient(AuthClient):
     def __init__(self, target: str, timeout_seconds: float = 2.0):
         self.target = target
         self.timeout_seconds = timeout_seconds
+        self.channel = None
+        self.stub = None
 
     def validate_token(self, token: str) -> TokenValidationResult:
         try:

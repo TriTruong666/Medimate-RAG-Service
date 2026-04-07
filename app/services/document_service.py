@@ -9,13 +9,16 @@ from sqlalchemy.orm import Session
 from app.models import Document, Embedding
 from app.schemas.document import DocumentResponse
 from app.services.file_service import process_file_in_memory
-from llama_index.core.node_parser import HierarchicalNodeParser, get_leaf_nodes
-from llama_index.core.schema import NodeRelationship
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import NodeRelationship, TextNode
+import re
+import json
+from sqlalchemy import func
 
 class DocumentService:
     file_types = ["pdf", "docx", "txt", "text", "doc", "json"]
-    _chunk_sizes = [2048, 512, 128]
-    _node_parser = HierarchicalNodeParser.from_defaults(chunk_sizes=_chunk_sizes)
+    # Medical-aware chunker: Chia chunk lớn tránh đứt gãy thực thể y khoa (thuốc - liều lượng)
+    _node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=150, paragraph_separator="\n\n")
     @staticmethod
     def save_upload_file(db: Session, file: UploadFile, filename: str):
         file_extension = file.filename.split(".")[-1].lower()
@@ -123,56 +126,63 @@ class DocumentService:
             if not llama_docs:
                 raise ValueError("Lỗi trích xuất nội dung từ file")
         
+            # Trích xuất metadata bổ sung
+            for doc_idx, llama_doc in enumerate(llama_docs):
+                llama_doc.metadata["document_name"] = doc.doc_name
+                # Giả lập extract type cho medical
+                llama_doc.metadata["category"] = "medical_data"
+                
             all_nodes = DocumentService._node_parser.get_nodes_from_documents(llama_docs)
 
-            leaf_nodes = get_leaf_nodes(all_nodes)
-
-            leaf_ids = {n.node_id for n in leaf_nodes}
+            print(f"--- Đang bắt đầu quá trình nạp {len(all_nodes)} chunks...")
+            
+            # Tối ưu: Batch Embedding (Nhanh hơn gấp nhiều lần so với embed từng node)
+            all_texts = [n.get_content() for n in all_nodes]
+            
+            print(f"--- Đang tính toán Vector (BAAI/bge-m3) cho {len(all_nodes)} đoạn văn bản...")
+            all_embeddings = embed_model.get_text_embedding_batch(all_texts)
+            print(f"--- Đã tính toán xong toàn bộ Vector.")
 
             db.query(Embedding).filter(Embedding.document_id == doc.id).delete()
             
             embedding_records = []
 
-            for node in all_nodes:
-                # -- Xử lý Parent ID --
+            for i, node in enumerate(all_nodes):
                 parent_id = None
                 if NodeRelationship.PARENT in node.relationships:
                     parent_id = node.relationships[NodeRelationship.PARENT].node_id
 
-                # -- Xác định xem có phải Leaf không --
-                is_leaf = node.node_id in leaf_ids
+                text_content = node.get_content()
                 
-                # -- Tính Vector --
-                # Logic quan trọng: CHỈ tính vector cho Leaf Node (tiết kiệm 2/3 tài nguyên)
-                vector_data = None
-                if is_leaf:
-                    # Đây là đoạn "Đang tính toán Vector..." trong code cũ
-                    vector_data = embed_model.get_text_embedding(node.get_content())
+                # Ép kiểu embedding về list float chuẩn
+                vector_data = [float(x) for x in all_embeddings[i]]
                 
-                # -- Xác định Level (Mẹo: dựa vào độ dài text hoặc chunk size) --
-                # Level 0 = Leaf (nhỏ nhất), Level càng cao càng to
-                current_level = 0
-                if not is_leaf:
-                    # Nếu không phải leaf, ta check chunk_size để đoán level
-                    # Ví dụ: size ~ 2048 là level 2, size ~ 512 là level 1
-                    # Hoặc đơn giản: 0 là Leaf, 1 là Non-Leaf
-                    current_level = 1 
+                # Làm sạch Metadata một cách triệt để
+                cleaned_metadata = {}
+                for k, v in node.metadata.items():
+                    # Chuyển đổi mọi loại numpy scalar sang python native
+                    if hasattr(v, "item"): 
+                        cleaned_metadata[k] = v.item()
+                    elif isinstance(v, list):
+                        cleaned_metadata[k] = [x.item() if hasattr(x, "item") else x for x in v]
+                    else:
+                        cleaned_metadata[k] = v
 
-                # -- Tạo Record --
                 emb_record = Embedding(
                     document_id=doc.id,
-                    text=node.get_content(),
-                    embedding=vector_data,  # Leaf thì có vector, Cha thì NULL
-                    metadata_=node.metadata,
-                    
-                    # Mapping ID chuẩn để sau này retrieve
+                    text=text_content,
+                    embedding=vector_data,
+                    metadata_=cleaned_metadata,
+                    fts_vector=func.to_tsvector("simple", text_content),
                     node_id=node.node_id,
                     parent_node_id=parent_id,
-                    
-                    level=current_level,
-                    chunk_size=len(node.get_content())
+                    level=0, 
+                    chunk_size=len(text_content)
                 )
                 embedding_records.append(emb_record)
+                
+                if (i + 1) % 50 == 0:
+                    print(f"--- Đã chuẩn bị xong {i + 1}/{len(all_nodes)} records...")
 
             batch_size = 100
             for i in range(0, len(embedding_records), batch_size):

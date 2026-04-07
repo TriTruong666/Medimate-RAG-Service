@@ -87,7 +87,9 @@ def get_application() -> FastAPI:
             connection.commit()  # Nhớ commit để lưu thay đổi
             logging.info("Đã kích hoạt Extension pgvector")
         RagBase.metadata.create_all(bind=rag_engine)
-        logging.info(f"Đã kết nối Database, khởi tạo thành công các bảng")
+        from app.core.db.rag_database import setup_database
+        setup_database()
+        logging.info(f"Đã kết nối Database, khởi tạo thành công các bảng và indexes")
     except Exception as e:
         logger.error(f"Kết nối đến Database thất bại: {e}")
 

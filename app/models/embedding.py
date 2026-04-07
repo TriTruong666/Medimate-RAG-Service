@@ -2,7 +2,7 @@
 
 from sqlalchemy import String, Column, Text, Integer, ForeignKey, JSON, func, DateTime
 from pgvector.sqlalchemy import Vector
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, TSVECTOR
 from app.core.db.rag_database import RagBase
 import uuid
 
@@ -17,7 +17,9 @@ class Embedding(RagBase):
 
     text = Column(Text, nullable=False)
 
-    embedding = Column(Vector(384), nullable=True) 
+    embedding = Column(Vector(1024), nullable=True) 
+
+    fts_vector = Column(TSVECTOR, nullable=True)
 
     metadata_ = Column("metadata", JSON, nullable=False)
 

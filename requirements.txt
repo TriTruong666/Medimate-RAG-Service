@@ -6,6 +6,7 @@ llama-index-llms-llama-cpp
 llama-index-embeddings-huggingface
 llama-index-readers-file
 llama-index-vector-stores-postgres
+sentence-transformers
 pydantic-settings
 python-dotenv
 pypdf

@@ -96,17 +96,17 @@ class RagConfigService:
         if not config:
             logger.info("Bắt đầu seed cấu hình RAG mặc định...")
             default_config = RagConfig(
-                embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+                embedding_model="BAAI/bge-m3",
                 llm_model=os.path.join(BASE_DIR, "app", "models_weights", "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
-                chunk_size=512,
-                chunk_overlap=50,
+                chunk_size=1024,
+                chunk_overlap=150,
                 top_k=5,
                 temperature=0.1,
-                max_tokens=512,
-                context_window=3900,
+                max_tokens=1024,
+                context_window=32768, # BGE-M3 và Qwen hỗ trợ context window tốt hơn
                 prompt_template=(
-                    "Dựa vào thông tin ngữ cảnh bên dưới, hãy trả lời câu hỏi bằng Tiếng Việt.\n"
-                    "Nếu thông tin không có trong ngữ cảnh, hãy nói 'Tôi không tìm thấy thông tin'.\n"
+                    "Dựa vào thông tin ngữ cảnh bên dưới, hãy trả lời câu hỏi bằng Tiếng Việt một cách chính xác nhất (đặc biệt là các chỉ số y khoa).\n"
+                    "BẮT BUỘC TRÍCH DẪN: Mỗi thông tin bạn trích dẫn phải ghi rõ nguồn theo định dạng [Nguồn: <tên tài liệu>].\n\n"
                     "---------------------\n"
                     "Ngữ cảnh:\n"
                     "{context_str}\n"
