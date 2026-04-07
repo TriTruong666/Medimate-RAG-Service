@@ -117,12 +117,15 @@ class ChatService:
                 final_text = "".join(response_obj.response_gen)
             else:
                 final_text = response_obj.response or ""
-            if not final_text.strip() or final_text.strip() == "Empty Response":
-                final_text = "Xin lỗi, tôi tìm thấy tài liệu liên quan nhưng không thể tổng hợp câu trả lời (Lỗi Model). Dưới đây là các nguồn tham khảo:"
-            
             sources = []
             if getattr(response_obj, "source_nodes", None):
                 sources = ChatService._format_sources(response_obj.source_nodes)
+
+            if not final_text.strip() or final_text.strip() == "Empty Response":
+                if not sources:
+                    final_text = "Tôi không tìm thấy bất kỳ thông tin nào liên quan đến câu hỏi của bạn trong cơ sở dữ liệu. Vui lòng nạp thêm tài liệu (upload & process) để tôi có thể hỗ trợ nhé!"
+                else:
+                    final_text = "Xin lỗi, tôi đã tìm thấy một số tài liệu y khoa liên quan nhưng không thể tổng hợp được câu trả lời chính xác. Bạn có thể tham khảo chi tiết ở các nguồn bên dưới:"
             
             return {
                 "answer": final_text,
@@ -143,16 +146,9 @@ class ChatService:
             for node_with_score in source_nodes:
                 node = node_with_score.node
                 meta = node.metadata or {}
-                raw_score = float(node_with_score.score) if node_with_score.score is not None else 0.0
-                distance = max(0.0, 1.0 - raw_score)
-                normalized_score = 1.0 / (1.0 + distance)
-                
                 formatted_sources.append({
                     "filename": meta.get("filename") or meta.get("doc_name") or "N/A",
                     "page": meta.get("page_label", "N/A"),
-                    "score": round(normalized_score, 4),
-                    "raw_score": round(raw_score, 4),
-                    "distance": round(distance, 4),
                     "snippet": node.get_content()[:150] + "..." 
                 })
         

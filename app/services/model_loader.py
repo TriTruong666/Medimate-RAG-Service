@@ -1,32 +1,43 @@
 import os
 import torch
 import logging
+import uuid
+from typing import Union, List, Optional
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from app.services.rag_config_service import RagConfigService
+from app.core.config import settings
 from sqlalchemy.orm import Session
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from sentence_transformers import CrossEncoder
+from app.models import AIModel
 
 logger = logging.getLogger(__name__)
 
-llm = None
-embed_model = None
+llm = None  # Giữ lại biến llm cho tương thích, nhưng thực tế dùng cache pool
+llm_pool = {}
 _reranker = None
 
-def get_llm(db: Session = None):
-    global llm
-    if llm is not None:
-        return llm
+def get_llm(db: Session = None, ai_model_id: Union[str, uuid.UUID] = None):
+    global llm, llm_pool
     
     # Nếu lần đầu load mà không có DB thì tạch
     if db is None:
         raise Exception("LLM chưa được khởi tạo. Cần truyền Session DB cho lần đầu!")
 
     rag_config = RagConfigService.get_rag_config(db)
-    model_record = rag_config.default_llm
     
-    if not model_record:
-        raise Exception("Không có LLM nào được gán trong RagConfig!")
+    if ai_model_id:
+        model_record = db.query(AIModel).filter(AIModel.id == ai_model_id).first()
+        if not model_record:
+            raise Exception(f"Không tìm thấy AI Model có ID: {ai_model_id}")
+    else:
+        model_record = rag_config.default_llm
+        if not model_record:
+            raise Exception("Không có LLM nào được gán trong RagConfig làm mặc định!")
+
+    model_id = model_record.id
+    if model_id in llm_pool:
+        return llm_pool[model_id]
 
     # Lấy thông số từ model_record config JSONB
     api_key = model_record.config.get("api_key") if model_record.config else None
@@ -35,18 +46,22 @@ def get_llm(db: Session = None):
     if not api_key:
         logger.warning(f"Model {model_record.name} thiếu cấu hình api_key, vui lòng cập nhật!")
 
-    print(f"Loading Google GenAI Model: {model_name}")
+    print(f"Loading Google GenAI Model: {model_name} (ID: {model_id})")
 
-    os.environ["GOOGLE_API_KEY"] = api_key if api_key else ""
-
-    from llama_index.llms.google_genai import Gemini
+    from llama_index.llms.google_genai import GoogleGenAI
     
-    llm = Gemini(
+    new_llm = GoogleGenAI(
         model=model_name,
+        api_key=api_key if api_key else "",
         temperature=rag_config.temperature,
         max_tokens=model_record.max_output_tokens,
     )
-    return llm
+    
+    llm_pool[model_id] = new_llm
+    if not ai_model_id:  # Gán vào biến global llm để tương thích nếu gọi get_llm không tham số
+        llm = new_llm
+        
+    return new_llm
 
 _embed_model = None
 def get_embed_model(db: Session = None):

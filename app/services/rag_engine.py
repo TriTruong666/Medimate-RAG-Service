@@ -69,7 +69,7 @@ class CustomPostgresRetriever(BaseRetriever):
 
         return nodes
 
-def get_engine(db, streaming: bool = True):
+def get_engine(db, streaming: bool = True, ai_model_id: str = None):
     if db is None:
         raise Exception("Session DB không được để trống!")
 
@@ -80,7 +80,7 @@ def get_engine(db, streaming: bool = True):
     
     
     embed_model = get_embed_model(db) 
-    llm_model = get_llm(db) 
+    llm_model = get_llm(db, ai_model_id=ai_model_id) 
     reranker = get_reranker(db)
     
     # Lấy thêm để reranker có dữ liệu lọc (Top 10 -> Reranker -> Top 5)
@@ -91,7 +91,32 @@ def get_engine(db, streaming: bool = True):
     )
 
     # Wrap prompt để yêu cầu Citation bắt buộc
-    citation_wrapper = config.prompt_template + "\n\nQUY TẮC BẮT BUỘC:\n- Bạn phải trích dẫn nguồn cho toàn bộ thông tin.\n- Sử dụng định dạng: [Nguồn: <tên tài liệu>]."
+    markdown_rules = """
+
+====================
+QUY TẮC TRẢ LỜI VÀ ĐỊNH DẠNG BẮT BUỘC:
+
+1. ĐỊNH DẠNG MARKDOWN CHUẨN:
+   - Sử dụng thẻ Heading (##, ###) để chia bố cục các phần rõ ràng.
+   - Sử dụng Bullet points (-) hoặc Numbered lists (1. 2. 3.) để liệt kê.
+   - In đậm (**từ khóa**) các ý chính hoặc cảnh báo quan trọng.
+   - Nếu có đoạn code, BẮT BUỘC phải đặt trong khối code block chuẩn (ví dụ: ```csharp ... ```).
+   - Phải xuống dòng rõ ràng (cách nhau 1 dòng trống) giữa các đoạn văn.
+
+2. CÁCH TRÍCH DẪN (CITATIONS):
+   - TUYỆT ĐỐI KHÔNG chèn trực tiếp tên file vào nội dung bài viết (Cấm dùng kiểu: [Nguồn: abc.docx]).
+   - Khi tham khảo thông tin từ context, chỉ đánh số thứ tự trong ngoặc vuông ở cuối câu. Ví dụ: "...yêu cầu chứng chỉ SSL/TLS [1][2]."
+
+3. DANH SÁCH TÀI LIỆU THAM KHẢO:
+   - Ở dưới cùng của câu trả lời, bắt buộc tạo một mục "### Nguồn tham khảo:"
+   - Liệt kê lại các tài liệu đã dùng tương ứng với số thứ tự.
+   - Ví dụ format:
+     [1] To enable HTTPS on your server.docx
+     [2] Security_Guidelines.pdf
+====================
+"""
+    
+    citation_wrapper = config.prompt_template + markdown_rules
     text_qa_template = PromptTemplate(citation_wrapper)
 
     query_engine = RetrieverQueryEngine.from_args(
@@ -104,12 +129,12 @@ def get_engine(db, streaming: bool = True):
 
     return query_engine
 
-def initialize_global_engine(streaming: bool = True):
+def initialize_global_engine(streaming: bool = True, ai_model_id: str = None):
    
     db = SessionLocal()
     try:
       
-        return get_engine(db=db, streaming=streaming)
+        return get_engine(db=db, streaming=streaming, ai_model_id=ai_model_id)
     finally:
         
         db.close()

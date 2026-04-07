@@ -10,13 +10,15 @@ from app.schemas.chat import ChatRequest
 router = APIRouter()
 
 
-_completion_engine_cache = None
+_completion_engine_cache = {}
 
-def get_cached_engine():
+def get_cached_engine(ai_model_id: str = None):
     global _completion_engine_cache
-    if _completion_engine_cache is None:
-        _completion_engine_cache = initialize_global_engine(streaming=False)
-    return _completion_engine_cache
+    cache_key = ai_model_id if ai_model_id is not None else "default"
+    
+    if cache_key not in _completion_engine_cache:
+        _completion_engine_cache[cache_key] = initialize_global_engine(streaming=False, ai_model_id=ai_model_id)
+    return _completion_engine_cache[cache_key]
 
 
 @router.post("/preload", summary="Preload Chat Engine", tags=["Chat"])
@@ -24,7 +26,7 @@ async def preload_chat_engine(
     _principal=RequireAdminOrUser,
 ):
     global _completion_engine_cache
-    was_ready = _completion_engine_cache is not None
+    was_ready = "default" in _completion_engine_cache
     started_at = time.perf_counter()
 
     engine = get_cached_engine()
@@ -42,7 +44,7 @@ async def preload_chat_engine(
 
 # @router.post("/stream", summary="Chat với Model LLM (Streaming)", tags=["Chat"])
 # async def chat_stream(req: ChatRequest):
-#     engine = get_cached_engine(streaming=True)
+#     engine = get_cached_engine(ai_model_id=req.ai_model_id, streaming=True)
 
 #     data_generator = ChatService.chat_stream_generator(engine, req.question)
     
@@ -52,16 +54,16 @@ async def preload_chat_engine(
 #     )
 
 @router.post("/completion", summary="Chat với Model LLM (Non-Streaming)", tags=["Chat"])
-async def chat_completion(
+def chat_completion(
     req: ChatRequest,
     _: None = Depends(rate_limit_chat_completion),
-    _principal=RequireAdminOrUser,
+    # _principal=RequireAdminOrUser,
 ):
     quick_reply = ChatService.build_quick_reply(req.question)
     if quick_reply is not None:
         return APIResponse.success(data=quick_reply)
 
-    engine = get_cached_engine()
+    engine = get_cached_engine(ai_model_id=req.ai_model_id)
     
     result = ChatService.chat_completion(engine, req.question)
     

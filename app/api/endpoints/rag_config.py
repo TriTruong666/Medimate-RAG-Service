@@ -10,7 +10,7 @@ router = APIRouter()
 @router.get("/current", summary="Lấy cấu hình RAG hiện tại", tags=["RAG Config"])
 async def get_rag_config(
     db=Depends(get_db),
-    _principal=RequireAdmin,
+    # _principal=RequireAdmin,
 ):
     config = RagConfigService.get_rag_config(db)
 
@@ -22,7 +22,7 @@ async def get_rag_config(
 @router.get("/", summary = "Lấy danh sách cấu hình", tags = ["RAG Config"])
 async def get_all_configs(
     db=Depends(get_db),
-    _principal=RequireAdmin,
+    # _principal=RequireAdmin,
 ):
     config = RagConfigService.list_configs(db)
     return APIResponse.success(
