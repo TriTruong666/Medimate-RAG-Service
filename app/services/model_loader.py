@@ -1,36 +1,17 @@
 import os
 import torch
-from llama_index.llms.llama_cpp import LlamaCPP
+import logging
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from app.services.rag_config_service import RagConfigService
 from sqlalchemy.orm import Session
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from sentence_transformers import CrossEncoder
 
+logger = logging.getLogger(__name__)
+
 llm = None
 embed_model = None
 _reranker = None
-
-
-def messages_to_prompt(messages):
-    prompt = "" 
-    for message in messages:
-        if message.role == "system":
-            prompt += f"<|im_start|>system\n{message.content}<|im_end|>\n"
-        elif message.role == "user":
-            prompt += f"<|im_start|>user\n{message.content}<|im_end|>\n"
-        elif message.role == "assistant":
-            prompt += f"<|im_start|>assistant\n{message.content}<|im_end|>\n"
-
-    # Đảm bảo kết thúc để AI biết đến lượt nó nói
-    if not prompt.endswith("<|im_start|>assistant\n"):
-        prompt += "<|im_start|>assistant\n"
-
-    return prompt
-
-def completion_to_prompt(completion):
-    return f"<|im_start|>user\n{completion}<|im_end|>\n<|im_start|>assistant\n"
-
 
 def get_llm(db: Session = None):
     global llm
@@ -41,27 +22,29 @@ def get_llm(db: Session = None):
     if db is None:
         raise Exception("LLM chưa được khởi tạo. Cần truyền Session DB cho lần đầu!")
 
-    config = RagConfigService.get_rag_config(db)
-    print(f"Loading LLM from: {config.llm_model}")
+    rag_config = RagConfigService.get_rag_config(db)
+    model_record = rag_config.default_llm
+    
+    if not model_record:
+        raise Exception("Không có LLM nào được gán trong RagConfig!")
 
-    llm = LlamaCPP(
-        model_path=config.llm_model,
-        temperature=config.temperature,
-        max_new_tokens=getattr(config, 'max_tokens', 512), 
-        context_window=getattr(config, 'context_window', 4096),
-        generate_kwargs={
-            "repeat_penalty": 1.1,
-            "top_p": 0.9,
-            "stop": ["<|im_end|>", "User:"],
-        },
-        model_kwargs={
-            "n_gpu_layers": -1,  # Đẩy toàn bộ model vào GPU (nếu có)
-            "n_batch": 512,      # Xử lý 512 token cùng lúc (tăng tốc prompt eval)
-            "n_ctx": getattr(config, 'context_window', 4096)
-        },
-        messages_to_prompt=messages_to_prompt,
-        completion_to_prompt=completion_to_prompt,
-        verbose=False,
+    # Lấy thông số từ model_record config JSONB
+    api_key = model_record.config.get("api_key") if model_record.config else None
+    model_name = model_record.config.get("model_name") if model_record.config else "models/gemini-2.5-pro"
+    
+    if not api_key:
+        logger.warning(f"Model {model_record.name} thiếu cấu hình api_key, vui lòng cập nhật!")
+
+    print(f"Loading Google GenAI Model: {model_name}")
+
+    os.environ["GOOGLE_API_KEY"] = api_key if api_key else ""
+
+    from llama_index.llms.google_genai import Gemini
+    
+    llm = Gemini(
+        model=model_name,
+        temperature=rag_config.temperature,
+        max_tokens=model_record.max_output_tokens,
     )
     return llm
 
@@ -71,16 +54,15 @@ def get_embed_model(db: Session = None):
     if _embed_model is not None:
         return _embed_model
     
-    if db is None:
-        raise Exception("Embed model chưa được khởi tạo. Cần truyền Session DB cho lần khởi tạo đầu tiên!")
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    config = RagConfigService.get_rag_config(db)
+    
+    # Lấy model name từ settings cho đồng bộ
+    model_name = settings.EMBEDDING_MODEL
 
-    print(f"Loading Embedding Model: {config.embedding_model} on {device}")
+    print(f"Loading Embedding Model: {model_name} on {device}")
     _embed_model = HuggingFaceEmbedding(
         device=device,
-        model_name=config.embedding_model if config.embedding_model else "BAAI/bge-m3",
+        model_name=model_name,
         cache_folder=os.path.join(os.getcwd(), "app", "models_weights"),
         embed_batch_size=100
     )

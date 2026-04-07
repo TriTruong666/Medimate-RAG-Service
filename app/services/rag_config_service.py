@@ -3,9 +3,9 @@ import os
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from app.models import RagConfig
+from app.models import RagConfig, AIModel
+from app.core.config import settings
 from fastapi import HTTPException, status
-
 from app.schemas.rag_config import RagConfigCreate, RagConfigUpdate
 
 BASE_DIR = os.getcwd()
@@ -91,19 +91,56 @@ class RagConfigService:
 
     @staticmethod
     def seed_config(db: Session):
-        config = db.query(RagConfig).first()
+        """Seed AI models and RAG configuration from JSON file."""
+        import json
+        seed_file = os.path.join(BASE_DIR, "seeds", "ai_model_seed.json")
         
+        if not os.path.exists(seed_file):
+            logger.warning(f"Không tìm thấy file seed: {seed_file}")
+            return
+
+        try:
+            with open(seed_file, "r", encoding="utf-8") as f:
+                seed_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Lỗi khi đọc file seed: {e}")
+            return
+
+        default_model = None
+
+        # 1. Seed/Sync AI Models
+        for item in seed_data:
+            model_name = item.get("name")
+            is_default = item.pop("is_default", False) # Lấy ra và xóa để không đưa vào constructor AIModel
+
+            llm = db.query(AIModel).filter(AIModel.name == model_name).first()
+            
+            if not llm:
+                logger.info(f"Seeding AI Model mới: {model_name}")
+                llm = AIModel(**item)
+                db.add(llm)
+                db.flush() # Để có ID
+            else:
+                # Update nếu đã tồn tại để đồng bộ cấu hình mới nhất từ file seed
+                for key, value in item.items():
+                    setattr(llm, key, value)
+                logger.info(f"Đã cập nhật cấu hình cho Model: {model_name}")
+
+            if is_default:
+                default_model = llm
+
+        db.commit()
+
+        # 2. Seed/Sync RagConfig mặc định
+        config = db.query(RagConfig).first()
         if not config:
-            logger.info("Bắt đầu seed cấu hình RAG mặc định...")
+            logger.info("Bắt đầu khởi tạo cấu hình RAG mặc định...")
             default_config = RagConfig(
-                embedding_model="BAAI/bge-m3",
-                llm_model=os.path.join(BASE_DIR, "app", "models_weights", "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
-                chunk_size=1024,
-                chunk_overlap=150,
+                name="Cấu hình y khoa mặc định",
+                default_llm_id=default_model.id if default_model else None,
                 top_k=5,
+                threshold=0.4,
                 temperature=0.1,
-                max_tokens=1024,
-                context_window=32768, # BGE-M3 và Qwen hỗ trợ context window tốt hơn
                 prompt_template=(
                     "Dựa vào thông tin ngữ cảnh bên dưới, hãy trả lời câu hỏi bằng Tiếng Việt một cách chính xác nhất (đặc biệt là các chỉ số y khoa).\n"
                     "BẮT BUỘC TRÍCH DẪN: Mỗi thông tin bạn trích dẫn phải ghi rõ nguồn theo định dạng [Nguồn: <tên tài liệu>].\n\n"
@@ -116,9 +153,11 @@ class RagConfigService:
                 )
             )
             db.add(default_config)
-            db.commit()
-            db.refresh(default_config)
-            return default_config
+        else:
+            # Luôn cập nhật default LLM từ file seed nếu có đánh dấu default
+            if default_model:
+                config.default_llm_id = default_model.id
         
-        logger.info("Cấu hình RAG đã tồn tại, bỏ qua bước seed.")
-        return config
+        db.commit()
+        logger.info("Hoàn tất quá trình đồng bộ dữ liệu Seed.")
+        return config

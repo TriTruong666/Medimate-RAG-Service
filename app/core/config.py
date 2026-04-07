@@ -11,9 +11,6 @@ BASE_DIR = os.getcwd()
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Meditate RAG Service"
     AUTHOR_NAME: str = "TriTruong666"
-    MODEL_PATH: str = os.path.join(
-        BASE_DIR, "app", "models_weights", "qwen2.5-1.5b-instruct-q4_k_m.gguf"
-    )
 
     APP_VERSION: str = "1.0.0"
 
@@ -23,7 +20,7 @@ class Settings(BaseSettings):
 
     RAW_UPLOAD_PATH: str = os.path.join(BASE_DIR, "data", "raw_data")
 
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
 
     RAG_DB_URL: str = os.getenv("RAG_DB_URL")
 

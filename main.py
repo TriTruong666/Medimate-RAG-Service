@@ -51,11 +51,24 @@ def print_banner():
     """
     print(logo)
 
+from app.services.model_loader import get_embed_model, get_llm, get_reranker
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         RagConfigService.seed_config(db)
+        
+        # Tiền tải (Preload) các models nặng (Embedding, LLM, Reranker)
+        # Mục đích: Giảm mạnh thời gian xử lý của request đầu tiên (tránh cold start)
+        logger.info("Đang tiền tải các AI Models vào RAM/VRAM...")
+        get_embed_model(db)
+        get_reranker(db)
+        try:
+            get_llm(db)
+        except Exception as e:
+            logger.warning(f"Chưa thể load LLM khởi tạo tự động, lỗi: {e}")
+            
     finally:
         db.close()
     yield
