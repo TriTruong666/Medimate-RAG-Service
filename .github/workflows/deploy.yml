@@ -75,6 +75,7 @@ jobs:
           script: |
             mkdir -p ~/projects/medimate/server/rag/seeds
             echo '${{ secrets.AI_MODEL_SEED_JSON }}' > ~/projects/medimate/server/rag/seeds/ai_model_seed.json
+            echo '${{ secrets.RAG_CONFIG_SEED_JSON }}' > ~/projects/medimate/server/rag/seeds/rag_config_seed.json
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
