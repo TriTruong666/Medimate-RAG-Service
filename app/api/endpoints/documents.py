@@ -21,6 +21,19 @@ async def upload_document(
         status_code=status.HTTP_201_CREATED,
     )
 
+@router.post("/bulk-upload-documents", status_code=status.HTTP_201_CREATED, summary="Upload nhiều tài liệu", tags=["Documents"])
+async def bulk_upload_documents(
+    db: Session = Depends(get_db),
+    files: list[UploadFile] = File(...),
+    # _principal=RequireAdmin,
+):
+    result = DocumentService.bulk_save_upload_files(db, files)
+    return APIResponse.success(
+        data=result,
+        message=f"Đã xử lý {result['total']} files. Thành công: {result['success_count']}, Thất bại: {result['error_count']}",
+        status_code=status.HTTP_201_CREATED,
+    )
+
 @router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
 async def process_document(
     document_id: str,

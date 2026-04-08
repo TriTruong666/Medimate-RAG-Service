@@ -67,6 +67,41 @@ class DocumentService:
         return {"message": f"Upload file {filename} thành công", "data": doc_schema}
     
     @staticmethod
+    def bulk_save_upload_files(db: Session, files: list[UploadFile]):
+        """Hỗ trợ tải lên nhiều tài liệu cùng một lúc"""
+        success_list = []
+        error_list = []
+        
+        for file in files:
+            try:
+                # Tận dụng logic của hàm đơn lẻ
+                res = DocumentService.save_upload_file(db, file, file.filename)
+                success_list.append({
+                    "filename": file.filename,
+                    "status": "success",
+                    "data": res["data"]
+                })
+            except HTTPException as e:
+                error_list.append({
+                    "filename": file.filename,
+                    "status": "failed",
+                    "reason": e.detail
+                })
+            except Exception as e:
+                error_list.append({
+                    "filename": file.filename,
+                    "status": "failed",
+                    "reason": str(e)
+                })
+                
+        return {
+            "total": len(files),
+            "success_count": len(success_list),
+            "error_count": len(error_list),
+            "items": success_list + error_list
+        }
+    
+    @staticmethod
     def get_list_documents(db: Session, page: int, limit: int, search_query: str = None):
 
         skip = (page - 1) * limit
