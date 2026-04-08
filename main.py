@@ -152,7 +152,7 @@ async def root():
 def main():
     print_banner()
 
-    uvicorn.run("main:app", port=settings.APP_PORT, host=settings.APP_HOST, reload=False)
+    uvicorn.run("main:app", port=settings.APP_PORT, host=settings.APP_HOST, reload=True)
 
 
 if __name__ == "__main__":
