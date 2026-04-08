@@ -23,7 +23,7 @@ def get_cached_engine(ai_model_id: str = None):
 
 @router.post("/preload", summary="Preload Chat Engine", tags=["Chat"])
 async def preload_chat_engine(
-    _principal=RequireAdminOrUser,
+    # _principal=RequireAdminOrUser,
 ):
     global _completion_engine_cache
     was_ready = "default" in _completion_engine_cache

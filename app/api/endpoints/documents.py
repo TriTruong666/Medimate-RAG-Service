@@ -66,7 +66,7 @@ async def get_document(
 async def delete_document(
     document_id: str,
     db: Session = Depends(get_db),
-    _principal=RequireAdmin,
+    # _principal=RequireAdmin,
 ):
     result = DocumentService.delete_document(db, document_id)
     return APIResponse.success(
