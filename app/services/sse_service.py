@@ -19,8 +19,13 @@ class SSEService:
         cls._queues[client_id] = queue
         try:
             while True:
-                data = await queue.get()
-                yield data
+                try:
+                    # Chờ dữ liệu từ queue hoặc timeout sau 30s để gửi heartbeat
+                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield data
+                except asyncio.TimeoutError:
+                    # Gửi heartbeat (comment trong giao thức SSE) để giữ kết nối
+                    yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             # Xử lý khi client ngắt kết nối
             if client_id in cls._queues:
