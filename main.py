@@ -8,6 +8,7 @@ from app.core.db.rag_database import SessionLocal
 from fastapi import FastAPI
 from app.services.rag_config_service import RagConfigService
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.proxy_headers import ProxyHeadersMiddleware
 from app.core.config import settings
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
@@ -84,6 +85,9 @@ def get_application() -> FastAPI:
         docs_url="/docs",
         lifespan=lifespan,
     )
+    # Handle HTTPS from Proxy
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
     # Config CORS
     app.add_middleware(
         CORSMiddleware,
