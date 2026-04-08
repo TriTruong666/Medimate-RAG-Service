@@ -100,67 +100,96 @@ class DocumentService:
         }
     
     @staticmethod
-    def process_document(db: Session, document_id: int):
+    def process_document(db: Session, document_id: str):
         doc = db.query(Document).filter(Document.id == document_id).first()
         embed_model = get_embed_model(db)
         if not doc:
             raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
         
+        return DocumentService._ingest_document(db, doc, embed_model)
+
+    @staticmethod
+    def process_collection(db: Session, collection_id: str):
+        """Xử lý nạp toàn bộ tài liệu trong một collection (Bulk Ingest)"""
+        docs = db.query(Document)\
+                 .filter(Document.collection_id == collection_id)\
+                 .filter(Document.status.in_(["uploaded", "failed"]))\
+                 .all()
+        
+        if not docs:
+            return {"message": "Không có tài liệu nào cần xử lý trong collection này."}
+
+        embed_model = get_embed_model(db)
+        success_count = 0
+        error_count = 0
+
+        print(f"--- Bắt đầu xử lý bulk cho Collection {collection_id} ({len(docs)} tài liệu)...")
+        
+        for doc in docs:
+            try:
+                DocumentService._ingest_document(db, doc, embed_model)
+                success_count += 1
+            except Exception as e:
+                error_count += 1
+                print(f"--- Lỗi khi xử lý file {doc.doc_name}: {e}")
+
+        return {
+            "message": f"Đã xử lý xong collection. Thành công: {success_count}, Thất bại: {error_count}",
+            "data": {
+                "total": len(docs),
+                "success": success_count,
+                "failed": error_count
+            }
+        }
+
+    @staticmethod
+    def _ingest_document(db: Session, doc: Document, embed_model):
+        """Logic lõi để xử lý và nạp một tài liệu vào vector db"""
         if doc.status == "indexed" or doc.status == "sent":
-            raise HTTPException(status_code=400, detail="File này đã học xong rồi")
+            return {"message": "Tài liệu đã được xử lý từ trước."}
 
         if doc.status == "indexing":
-            raise HTTPException(status_code=400, detail="File này đang được xử lý, vui lòng chờ")
+            raise HTTPException(status_code=400, detail="Tài liệu đang trong quá trình xử lý...")
+
         try:
             doc.status = "indexing"
             db.commit()
 
             if not os.path.exists(doc.file_path):
-                raise FileNotFoundError(f"Không tìm thấy file trong folder dữ liệu thô: {doc.file_path}")
+                raise FileNotFoundError(f"Không tìm thấy file: {doc.file_path}")
             
             with open(doc.file_path, "rb") as f:
                 file_bytes = f.read()
 
             llama_docs = process_file_in_memory(doc.doc_name, file_bytes)
-
             if not llama_docs:
-                raise ValueError("Lỗi trích xuất nội dung từ file")
+                raise ValueError("Không thể trích xuất nội dung từ file")
         
-            # Trích xuất metadata bổ sung
-            for doc_idx, llama_doc in enumerate(llama_docs):
+            for llama_doc in llama_docs:
                 llama_doc.metadata["document_name"] = doc.doc_name
-                # Giả lập extract type cho medical
                 llama_doc.metadata["category"] = "medical_data"
                 
             all_nodes = DocumentService._node_parser.get_nodes_from_documents(llama_docs)
-
-            print(f"--- Đang bắt đầu quá trình nạp {len(all_nodes)} chunks...")
-            
-            # Tối ưu: Batch Embedding (Nhanh hơn gấp nhiều lần so với embed từng node)
             all_texts = [n.get_content() for n in all_nodes]
             
-            print(f"--- Đang tính toán Vector ({settings.EMBEDDING_MODEL}) cho {len(all_nodes)} đoạn văn bản...")
+            # Batch embedding
             all_embeddings = embed_model.get_text_embedding_batch(all_texts)
-            print(f"--- Đã tính toán xong toàn bộ Vector.")
 
+            # Xóa các embedding cũ nếu có (re-index)
             db.query(Embedding).filter(Embedding.document_id == doc.id).delete()
             
             embedding_records = []
-
             for i, node in enumerate(all_nodes):
                 parent_id = None
                 if NodeRelationship.PARENT in node.relationships:
                     parent_id = node.relationships[NodeRelationship.PARENT].node_id
 
                 text_content = node.get_content()
-                
-                # Ép kiểu embedding về list float chuẩn
                 vector_data = [float(x) for x in all_embeddings[i]]
                 
-                # Làm sạch Metadata một cách triệt để
+                # Metadata cleaning
                 cleaned_metadata = {}
                 for k, v in node.metadata.items():
-                    # Chuyển đổi mọi loại numpy scalar sang python native
                     if hasattr(v, "item"): 
                         cleaned_metadata[k] = v.item()
                     elif isinstance(v, list):
@@ -180,10 +209,8 @@ class DocumentService:
                     chunk_size=len(text_content)
                 )
                 embedding_records.append(emb_record)
-                
-                if (i + 1) % 50 == 0:
-                    print(f"--- Đã chuẩn bị xong {i + 1}/{len(all_nodes)} records...")
 
+            # Bulk insert embeddings
             batch_size = 100
             for i in range(0, len(embedding_records), batch_size):
                 batch = embedding_records[i : i + batch_size]
@@ -194,15 +221,15 @@ class DocumentService:
             db.commit()
 
             return {
-                "message": "Nạp dữ liệu thành công",
+                "message": f"Nạp tài liệu {doc.doc_name} thành công",
+                "status": "success"
             }
 
         except Exception as e:
             db.rollback()
             doc.status = "failed"
             db.commit()
-            print(f"Error ingest: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise e
 
     @staticmethod
     def get_document_by_id(db: Session, document_id: int):

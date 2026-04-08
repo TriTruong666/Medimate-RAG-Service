@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 from app.core.db.rag_database import get_db
 from app.services.collection_service import CollectionService
+from app.services.document_service import DocumentService
 from app.schemas.collection import CollectionCreate, CollectionUpdate, CollectionDocumentsUpdate
 from app.core.common.interceptor import APIResponse
 from typing import Optional
@@ -87,4 +88,15 @@ async def sync_documents(
     result = CollectionService.sync_documents(db, collection_id, payload.document_ids)
     return APIResponse.success(
         message=result["message"]
+    )
+
+@router.post("/{collection_id}/process", status_code=status.HTTP_200_OK, summary="Nạp toàn bộ tài liệu trong collection (Bulk Ingest)", tags=["Collections"])
+async def process_collection(
+    collection_id: UUID,
+    db: Session = Depends(get_db)
+):
+    result = DocumentService.process_collection(db, str(collection_id))
+    return APIResponse.success(
+        message=result["message"],
+        data=result.get("data")
     )
