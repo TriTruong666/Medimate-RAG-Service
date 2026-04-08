@@ -11,15 +11,17 @@ class ChatService:
     @staticmethod
     def build_quick_reply(question: str):
         normalized_question = question.strip().lower()
-        greetings = {"hi", "hello", "helo", "hey", "chào", "xin chào"}
-        if normalized_question in greetings:
+        greetings = {"hi", "hello", "helo", "hey", "chào", "xin chào", "bạn là ai", "ai đây", "tên gì", "bạn tên gì"}
+        
+        if any(greet in normalized_question for greet in greetings):
             return {
-                "answer": "Chào bạn! Mình có thể giúp gì cho bạn hôm nay?",
+                "answer": "Chào bạn! Tôi là Medimate AI - trợ lý ảo y tế thông minh. Tôi ở đây để hỗ trợ bạn giải đáp các thắc mắc về sức khỏe và y khoa. Bạn cần tôi giúp gì hôm nay?",
                 "sources": [],
             }
-        if not normalized_question or len(normalized_question) < 3:
+        
+        if not normalized_question or len(normalized_question) < 2:
             return {
-                "answer": "Mình chưa hiểu rõ câu hỏi. Bạn có thể mô tả chi tiết hơn giúp mình không?",
+                "answer": "Chào bạn! Tôi có thể giúp gì cho bạn về vấn đề y khoa không?",
                 "sources": [],
             }
         return None
@@ -123,9 +125,11 @@ class ChatService:
 
             if not final_text.strip() or final_text.strip() == "Empty Response":
                 if not sources:
-                    final_text = "Tôi không tìm thấy bất kỳ thông tin nào liên quan đến câu hỏi của bạn trong cơ sở dữ liệu. Vui lòng nạp thêm tài liệu (upload & process) để tôi có thể hỗ trợ nhé!"
+                    # Nếu không có tài liệu, thay vì trả lời máy móc, ta để AI tự giới thiệu hoặc trả lời tự nhiên
+                    # Có thể fallback về một câu trả lời mang tính gợi mở hơn
+                    final_text = "Chào bạn! Tôi là trợ lý ảo Medimate AI. Hiện tại tôi chưa tìm thấy tài liệu cụ thể trong cơ sở dữ liệu để giải đáp câu hỏi này một cách chi tiết nhất. Tuy nhiên, tôi vẫn luôn sẵn sàng hỗ trợ bạn các thông tin y khoa cơ bản khác nếu bạn cần!"
                 else:
-                    final_text = "Xin lỗi, tôi đã tìm thấy một số tài liệu y khoa liên quan nhưng không thể tổng hợp được câu trả lời chính xác. Bạn có thể tham khảo chi tiết ở các nguồn bên dưới:"
+                    final_text = "Xin lỗi, tôi đã tìm thấy một số tài liệu liên quan nhưng không thể tổng hợp được câu trả lời chính xác nhất. Với vai trò là trợ lý y tế Medimate, tôi khuyên bạn nên kiểm tra kỹ các nguồn bên dưới hoặc tham khảo ý kiến bác sĩ chuyên khoa nhé."
             
             return {
                 "answer": final_text,
