@@ -95,14 +95,20 @@ def get_application() -> FastAPI:
     app.add_exception_handler(Exception, general_exception_handler)
 
     try:
+        if settings.IS_RESET_DB:
+            logger.info("Đang reset database (IS_RESET_DB=True)...")
+            RagBase.metadata.drop_all(bind=rag_engine)
+            logger.info("Đã xóa toàn bộ bảng dữ liệu cũ.")
+
         with rag_engine.connect() as connection:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            connection.commit()  # Nhớ commit để lưu thay đổi
-            logging.info("Đã kích hoạt Extension pgvector")
+            connection.commit() 
+            logger.info("Đã kích hoạt Extension pgvector")
+            
         RagBase.metadata.create_all(bind=rag_engine)
         from app.core.db.rag_database import setup_database
         setup_database()
-        logging.info(f"Đã kết nối Database, khởi tạo thành công các bảng và indexes")
+        logger.info(f"Đã kết nối Database, khởi tạo thành công các bảng và indexes")
     except Exception as e:
         logger.error(f"Kết nối đến Database thất bại: {e}")
 

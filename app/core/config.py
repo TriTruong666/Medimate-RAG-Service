@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     RAW_UPLOAD_PATH: str = os.path.join(BASE_DIR, "data", "raw_data")
 
-    EMBEDDING_MODEL: str = "Alibaba-NLP/gte-multilingual-base"
+    EMBEDDING_MODEL: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     RERANKER_MODEL: str = "BAAI/bge-reranker-base"
 
     RAG_DB_URL: str = os.getenv("RAG_DB_URL")
@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     AUTH_PROVIDER: str = os.getenv("AUTH_PROVIDER")
     AUTH_GRPC_TARGET: str = os.getenv("AUTH_GRPC_TARGET")
     AUTH_GRPC_TIMEOUT_SECONDS: float = float(os.getenv("AUTH_GRPC_TIMEOUT_SECONDS", "2.0"))
+    
+    IS_RESET_DB: bool = os.getenv("IS_RESET_DB", "True").lower() in ("true", "1", "t")
 
 settings = Settings()
 
