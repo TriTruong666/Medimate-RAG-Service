@@ -84,7 +84,7 @@ def get_application() -> FastAPI:
     # Config CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # mốt nhớ đổi domain riel
+        allow_origins=["http://localhost:5173", "https://medimate.health.vn", "https://medimate.health.vn/", "https://medimate.health.vn/", "https://medimate.health.vn/"],  # mốt nhớ đổi domain riel
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
