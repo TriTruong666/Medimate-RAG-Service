@@ -41,9 +41,12 @@ jobs:
 
   deploy:
     needs: build-and-push
-    # ... các bước deploy bên dưới giữ nguyên như cũ ...
     runs-on: ubuntu-latest
     steps:
+      # --- BƯỚC QUAN TRỌNG: Phải lấy code về máy ảo này thì mới có file để copy ---
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Prepare VPS directory
         uses: appleboy/ssh-action@master
         with:
@@ -72,6 +75,7 @@ jobs:
           command_timeout: 20m
           script: |
             cd ~/projects/medimate/server/rag
+            # Lưu ý: GITHUB_TOKEN chỉ có hiệu lực khi job đang chạy
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
