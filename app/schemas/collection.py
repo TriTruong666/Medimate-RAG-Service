@@ -22,6 +22,10 @@ class CollectionResponse(CollectionBase):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class CollectionDetailResponse(CollectionResponse):
+    documents: List[DocumentResponse] = []
+
+
 class CollectionListResponse(BaseModel):
     items: List[CollectionResponse]
     pagination: PaginationSchema

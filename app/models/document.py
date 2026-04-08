@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, DateTime, func, Integer, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.core.db.rag_database import RagBase
 import uuid
@@ -22,3 +23,6 @@ class Document(RagBase):
         ForeignKey("collections.id", ondelete="SET NULL"), 
         nullable=True
     )
+
+    # Relationships
+    collection = relationship("Collection", back_populates="documents")

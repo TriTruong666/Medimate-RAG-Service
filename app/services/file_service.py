@@ -26,7 +26,11 @@ def process_file_in_memory(filename: str, file_bytes: bytes):
                 text_content += para.text + "\n"
 
         # 3. Xử lý TXT & MD
-        elif filename.lower().endswith(".txt") or filename.lower().endswith(".text") or filename.lower().endswith(".md"):
+        elif (
+            filename.lower().endswith(".txt")
+            or filename.lower().endswith(".text")
+            or filename.lower().endswith(".md")
+        ):
             text_content = file_stream.read().decode("utf-8")
 
         # 4. Xử lý JSON

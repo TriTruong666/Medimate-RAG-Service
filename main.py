@@ -51,14 +51,16 @@ def print_banner():
     """
     print(logo)
 
+
 from app.services.model_loader import get_embed_model, get_llm, get_reranker
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         RagConfigService.seed_config(db)
-        
+
         # Tiền tải (Preload) các models nặng (Embedding, LLM, Reranker)
         # Mục đích: Giảm mạnh thời gian xử lý của request đầu tiên (tránh cold start)
         logger.info("Đang tiền tải các AI Models vào RAM/VRAM...")
@@ -68,10 +70,11 @@ async def lifespan(app: FastAPI):
             get_llm(db)
         except Exception as e:
             logger.warning(f"Chưa thể load LLM khởi tạo tự động, lỗi: {e}")
-            
+
     finally:
         db.close()
     yield
+
 
 def get_application() -> FastAPI:
     # Config app
@@ -106,11 +109,12 @@ def get_application() -> FastAPI:
 
         with rag_engine.connect() as connection:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            connection.commit() 
+            connection.commit()
             logger.info("Đã kích hoạt Extension pgvector")
-            
+
         RagBase.metadata.create_all(bind=rag_engine)
         from app.core.db.rag_database import setup_database
+
         setup_database()
         logger.info(f"Đã kết nối Database, khởi tạo thành công các bảng và indexes")
     except Exception as e:
@@ -121,6 +125,7 @@ def get_application() -> FastAPI:
 
 # Khởi tạo app
 app = get_application()
+
 
 def custom_openapi():
     if app.openapi_schema:
@@ -146,10 +151,12 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
 
 # Gắn router API
 app.include_router(api_router, prefix="/api/v1")
+
 
 @app.get("/system/health", tags=["Health Check"])
 async def root():

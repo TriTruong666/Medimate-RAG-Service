@@ -17,15 +17,16 @@ llm = None  # Giữ lại biến llm cho tương thích, nhưng thực tế dùn
 llm_pool = {}
 _reranker = None
 
+
 def get_llm(db: Session = None, ai_model_id: Union[str, uuid.UUID] = None):
     global llm, llm_pool
-    
+
     # Nếu lần đầu load mà không có DB thì tạch
     if db is None:
         raise Exception("LLM chưa được khởi tạo. Cần truyền Session DB cho lần đầu!")
 
     rag_config = RagConfigService.get_rag_config(db)
-    
+
     if ai_model_id:
         model_record = db.query(AIModel).filter(AIModel.id == ai_model_id).first()
         if not model_record:
@@ -41,36 +42,47 @@ def get_llm(db: Session = None, ai_model_id: Union[str, uuid.UUID] = None):
 
     # Lấy thông số từ model_record config JSONB
     api_key = model_record.config.get("api_key") if model_record.config else None
-    model_name = model_record.config.get("model_name") if model_record.config else "models/gemini-2.5-pro"
-    
+    model_name = (
+        model_record.config.get("model_name")
+        if model_record.config
+        else "models/gemini-2.5-pro"
+    )
+
     if not api_key:
-        logger.warning(f"Model {model_record.name} thiếu cấu hình api_key, vui lòng cập nhật!")
+        logger.warning(
+            f"Model {model_record.name} thiếu cấu hình api_key, vui lòng cập nhật!"
+        )
 
     print(f"Loading Google GenAI Model: {model_name} (ID: {model_id})")
 
     from llama_index.llms.google_genai import GoogleGenAI
-    
+
     new_llm = GoogleGenAI(
         model=model_name,
         api_key=api_key if api_key else "",
         temperature=rag_config.temperature,
         max_tokens=model_record.max_output_tokens,
     )
-    
+
     llm_pool[model_id] = new_llm
-    if not ai_model_id:  # Gán vào biến global llm để tương thích nếu gọi get_llm không tham số
+    if (
+        not ai_model_id
+    ):  # Gán vào biến global llm để tương thích nếu gọi get_llm không tham số
         llm = new_llm
-        
+
     return new_llm
 
+
 _embed_model = None
+
+
 def get_embed_model(db: Session = None):
     global _embed_model
     if _embed_model is not None:
         return _embed_model
-    
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+
     # Lấy model name từ settings cho đồng bộ
     model_name = settings.EMBEDDING_MODEL
 
@@ -80,13 +92,14 @@ def get_embed_model(db: Session = None):
         model_name=model_name,
         cache_folder=os.path.join(os.getcwd(), "app", "models_weights"),
         embed_batch_size=100,
-        trust_remote_code=True
+        trust_remote_code=True,
     )
     return _embed_model
 
 
 class MedicalReranker(BaseNodePostprocessor):
     """Custom Reranker using Sentence Transformers CrossEncoder for Medical accuracy."""
+
     _model: any = None
     _top_n: int = 3
 
@@ -102,35 +115,33 @@ class MedicalReranker(BaseNodePostprocessor):
     def _postprocess_nodes(self, nodes, query_bundle):
         if not nodes:
             return []
-        
+
         query_str = query_bundle.query_str
         texts = [node.get_content() for node in nodes]
-        
+
         # Reranker returns raw similarity scores
         # show_progress_bar=False để không hiện thanh load mỗi lần hỏi
-        scores = self._model.predict([[query_str, text] for text in texts], show_progress_bar=False)
-        
+        scores = self._model.predict(
+            [[query_str, text] for text in texts], show_progress_bar=False
+        )
+
         for node, score in zip(nodes, scores):
             # Ép kiểu từ numpy.float32 về float chuẩn Python để tránh lỗi JSON serializable
             node.score = float(score)
-            
+
         nodes.sort(key=lambda x: x.score, reverse=True)
-        return nodes[:self._top_n]
+        return nodes[: self._top_n]
 
 
 def get_reranker(db: Session = None):
     global _reranker
     if _reranker is not None:
         return _reranker
-    
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model_name = settings.RERANKER_MODEL
-    
+
     print(f"Loading Reranker Model: {model_name} on {device}")
-    
-    _reranker = MedicalReranker(
-        model_name=model_name, 
-        top_n=3,
-        device=device
-    )
+
+    _reranker = MedicalReranker(model_name=model_name, top_n=3, device=device)
     return _reranker

@@ -21,10 +21,7 @@ class RagConfigService:
     def get_config_by_id(db: Session, config_id: int):
         config = db.query(RagConfig).filter(RagConfig.id == config_id).first()
         if not config:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Không tìm thấy cấu hình RAG"
-            )
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy cấu hình RAG")
         return config
 
     @staticmethod
@@ -78,23 +75,22 @@ class RagConfigService:
                 detail=f"Lỗi DB khi xoá cấu hình",
             )
 
-    
     @staticmethod
     def get_rag_config(db: Session):
         config = db.query(RagConfig).first()
         if not config:
-           raise HTTPException(
-                status_code=404, 
-                detail=f"Chưa có cấu hình RAG trong hệ thống!"
+            raise HTTPException(
+                status_code=404, detail=f"Chưa có cấu hình RAG trong hệ thống!"
             )
         return config
 
     @staticmethod
     def seed_config(db: Session):
         import json
+
         model_seed_file = os.path.join(BASE_DIR, "seeds", "ai_model_seed.json")
         config_seed_file = os.path.join(BASE_DIR, "seeds", "rag_config_seed.json")
-        
+
         try:
             default_model_id = None
 
@@ -102,19 +98,19 @@ class RagConfigService:
             if os.path.exists(model_seed_file):
                 with open(model_seed_file, "r", encoding="utf-8") as f:
                     model_seed_data = json.load(f)
-                
+
                 for item in model_seed_data:
                     data = item.copy()
                     model_name = data.get("name")
                     is_default = data.pop("is_default", False)
 
                     llm = db.query(AIModel).filter(AIModel.name == model_name).first()
-                    
+
                     if not llm:
                         logger.info(f"Seeding AI Model mới: {model_name}")
                         llm = AIModel(**data)
                         db.add(llm)
-                        db.flush() 
+                        db.flush()
                     else:
                         for key, value in data.items():
                             setattr(llm, key, value)
@@ -129,13 +125,12 @@ class RagConfigService:
             if os.path.exists(config_seed_file):
                 with open(config_seed_file, "r", encoding="utf-8") as f:
                     config_seed_data = json.load(f)
-                
+
                 config = db.query(RagConfig).first()
                 if not config:
                     logger.info("Bắt đầu khởi tạo cấu hình RAG mặc định từ JSON...")
                     config = RagConfig(
-                        **config_seed_data,
-                        default_llm_id=default_model_id
+                        **config_seed_data, default_llm_id=default_model_id
                     )
                     db.add(config)
                 else:
@@ -146,11 +141,13 @@ class RagConfigService:
                         config.default_llm_id = default_model_id
                     logger.info("Đã cập nhật cấu hình RAG từ file JSON.")
             else:
-                logger.warning(f"Không tìm thấy file seed RagConfig: {config_seed_file}")
-            
+                logger.warning(
+                    f"Không tìm thấy file seed RagConfig: {config_seed_file}"
+                )
+
             db.commit()
             logger.info("Hoàn tất quá trình đồng bộ dữ liệu Seed.")
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"LỖI NGHIÊM TRỌNG TRONG SEED CONFIG: {e}")

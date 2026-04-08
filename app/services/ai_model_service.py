@@ -8,11 +8,18 @@ from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
+
 class AIModelService:
     @staticmethod
     def get_list(db: Session, skip: int = 0, limit: int = 100):
         """Lấy danh sách tất cả các AI Model."""
-        return db.query(AIModel).order_by(AIModel.created_at.desc()).offset(skip).limit(limit).all()
+        return (
+            db.query(AIModel)
+            .order_by(AIModel.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def get_by_id(db: Session, model_id: UUID):
@@ -21,7 +28,7 @@ class AIModelService:
         if not model:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Không tìm thấy AI Model này"
+                detail="Không tìm thấy AI Model này",
             )
         return model
 
@@ -33,9 +40,9 @@ class AIModelService:
         if exist_model:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Model với tên '{payload.name}' đã tồn tại"
+                detail=f"Model với tên '{payload.name}' đã tồn tại",
             )
-            
+
         try:
             model = AIModel(**payload.model_dump())
             db.add(model)
@@ -54,18 +61,20 @@ class AIModelService:
     def update(db: Session, model_id: UUID, payload: AIModelUpdate):
         """Cập nhật thông tin AI Model."""
         model = AIModelService.get_by_id(db, model_id)
-        
+
         updated_data = payload.model_dump(exclude_unset=True)
         if not updated_data:
             return model
-            
+
         # Kiểm tra trùng tên nếu có cập nhật tên
         if "name" in updated_data and updated_data["name"] != model.name:
-            exist_model = db.query(AIModel).filter(AIModel.name == updated_data["name"]).first()
+            exist_model = (
+                db.query(AIModel).filter(AIModel.name == updated_data["name"]).first()
+            )
             if exist_model:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Model với tên '{updated_data['name']}' đã tồn tại"
+                    detail=f"Model với tên '{updated_data['name']}' đã tồn tại",
                 )
 
         try:

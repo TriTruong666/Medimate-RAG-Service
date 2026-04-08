@@ -5,15 +5,16 @@ import uuid
 
 router = APIRouter()
 
+
 @router.get("/stream/{client_id}", summary="Kết nối SSE Stream", tags=["SSE"])
 async def sse_endpoint(request: Request, client_id: str):
     """
     Endpoint duy trì kết nối SSE. FE sẽ kết nối vào đây qua EventSource.
     """
     return StreamingResponse(
-        SSEService.subscribe(client_id),
-        media_type="text/event-stream"
+        SSEService.subscribe(client_id), media_type="text/event-stream"
     )
+
 
 @router.post("/test-event", summary="Test SSE Event (Dành cho Dev)", tags=["SSE"])
 async def test_sse_event(client_id: str, message: str):
@@ -22,13 +23,19 @@ async def test_sse_event(client_id: str, message: str):
     await SSEService.send_alert(client_id, "Thông báo thử nghiệm", "SSE hoạt động tốt!")
     return {"message": "Event sent"}
 
-@router.post("/send-notification", summary="Gửi thông báo trực tiếp qua SSE", tags=["SSE"])
-async def send_notification(client_id: str, title: str, message: str, alert_type: str = "info"):
+
+@router.post(
+    "/send-notification", summary="Gửi thông báo trực tiếp qua SSE", tags=["SSE"]
+)
+async def send_notification(
+    client_id: str, title: str, message: str, alert_type: str = "info"
+):
     """
     API dùng để bắn ngay một thông báo (Alert) tới client cụ thể mà không cần lưu DB.
     - client_id: ID của người nhận (hoặc 'all' để gửi tất cả)
     - alert_type: info, success, warning, error
     """
     from app.core.common.interceptor import APIResponse
+
     await SSEService.send_alert(client_id, title, message, alert_type)
     return APIResponse.success(message="Thông báo đã được gửi.")

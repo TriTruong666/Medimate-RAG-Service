@@ -16,6 +16,7 @@ from app.core.config import settings
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
+
 class CustomPostgresRetriever(BaseRetriever):
     def __init__(self, engine, embed_model, top_k: int = 5):
         self._engine = engine
@@ -25,12 +26,13 @@ class CustomPostgresRetriever(BaseRetriever):
 
     def _retrieve(self, query_bundle) -> List[NodeWithScore]:
         query_str = query_bundle.query_str
-        
+
         query_embedding = self._embed_model.get_text_embedding(query_str)
-        
+
         vector_str = str(query_embedding)
 
-        sql = text("""
+        sql = text(
+            """
         WITH semantic_search AS (
             SELECT id, text, metadata, (1.0 - (embedding <=> :vector)) AS semantic_score
             FROM embeddings
@@ -54,12 +56,15 @@ class CustomPostgresRetriever(BaseRetriever):
         FULL OUTER JOIN keyword_search k ON s.id = k.id
         ORDER BY combined_score DESC
         LIMIT :limit;
-        """)
+        """
+        )
 
         nodes = []
         with self._engine.connect() as conn:
-            results = conn.execute(sql, {"vector": vector_str, "limit": self._top_k, "query": query_str}).fetchall()
-            
+            results = conn.execute(
+                sql, {"vector": vector_str, "limit": self._top_k, "query": query_str}
+            ).fetchall()
+
             for row in results:
                 score = float(row[3])
                 # Đưa thêm metadata vào text node
@@ -69,25 +74,22 @@ class CustomPostgresRetriever(BaseRetriever):
 
         return nodes
 
+
 def get_engine(db, streaming: bool = True, ai_model_id: str = None):
     if db is None:
         raise Exception("Session DB không được để trống!")
 
-    
     config = RagConfigService.get_rag_config(db)
 
     connection_string = settings.RAG_DB_URL
-    
-    
-    embed_model = get_embed_model(db) 
-    llm_model = get_llm(db, ai_model_id=ai_model_id) 
+
+    embed_model = get_embed_model(db)
+    llm_model = get_llm(db, ai_model_id=ai_model_id)
     reranker = get_reranker(db)
-    
+
     # Lấy thêm để reranker có dữ liệu lọc (Top 10 -> Reranker -> Top 5)
     retriever = CustomPostgresRetriever(
-        engine=rag_engine,
-        embed_model=embed_model,
-        top_k=config.top_k + 5 
+        engine=rag_engine, embed_model=embed_model, top_k=config.top_k + 5
     )
 
     # Wrap prompt để yêu cầu Citation bắt buộc
@@ -111,7 +113,7 @@ QUY TẮC TRẢ LỜI VÀ ĐỊNH DẠNG:
    - KHÔNG CẦN chèn trích dẫn mã nguồn cuối bài.
 ====================
 """
-    
+
     citation_wrapper = config.prompt_template + markdown_rules
     text_qa_template = PromptTemplate(citation_wrapper)
 
@@ -120,17 +122,18 @@ QUY TẮC TRẢ LỜI VÀ ĐỊNH DẠNG:
         llm=llm_model,
         node_postprocessors=[reranker],
         text_qa_template=text_qa_template,
-        streaming=streaming
+        streaming=streaming,
     )
 
     return query_engine
 
+
 def initialize_global_engine(streaming: bool = True, ai_model_id: str = None):
-   
+
     db = SessionLocal()
     try:
-      
+
         return get_engine(db=db, streaming=streaming, ai_model_id=ai_model_id)
     finally:
-        
+
         db.close()

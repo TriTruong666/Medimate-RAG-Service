@@ -16,17 +16,21 @@ import re
 import json
 from sqlalchemy import func
 
+
 class DocumentService:
     file_types = ["pdf", "docx", "txt", "text", "doc", "json", "md"]
     # Medical-aware chunker: Chia chunk lớn tránh đứt gãy thực thể y khoa (thuốc - liều lượng)
-    _node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=150, paragraph_separator="\n\n")
+    _node_parser = SentenceSplitter(
+        chunk_size=1024, chunk_overlap=150, paragraph_separator="\n\n"
+    )
+
     @staticmethod
     def save_upload_file(db: Session, file: UploadFile, filename: str):
         file_extension = file.filename.split(".")[-1].lower()
         if file_extension not in DocumentService.file_types:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Loại file không hợp lệ. Chỉ chấp nhận: {', '.join(DocumentService.file_types)}"
+                status_code=400,
+                detail=f"Loại file không hợp lệ. Chỉ chấp nhận: {', '.join(DocumentService.file_types)}",
             )
 
         file_checksum = calculate_file_hash(file)
@@ -37,8 +41,7 @@ class DocumentService:
 
         if existed_doc:
             raise HTTPException(
-                status_code=400, 
-                detail="File này đã tồn tại trong hệ thống rồi!"
+                status_code=400, detail="File này đã tồn tại trong hệ thống rồi!"
             )
 
         file_path = os.path.join(settings.RAW_UPLOAD_PATH, filename)
@@ -48,7 +51,7 @@ class DocumentService:
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
         file_size_in_bytes = os.path.getsize(file_path)
 
         new_doc = Document(
@@ -66,47 +69,47 @@ class DocumentService:
         doc_schema = DocumentResponse.model_validate(new_doc)
 
         return {"message": f"Upload file {filename} thành công", "data": doc_schema}
-    
+
     @staticmethod
     def bulk_save_upload_files(db: Session, files: list[UploadFile]):
         """Hỗ trợ tải lên nhiều tài liệu cùng một lúc"""
         success_list = []
         error_list = []
-        
+
         for file in files:
             try:
                 # Tận dụng logic của hàm đơn lẻ
                 res = DocumentService.save_upload_file(db, file, file.filename)
-                success_list.append({
-                    "filename": file.filename,
-                    "status": "success",
-                    "data": res["data"]
-                })
+                success_list.append(
+                    {
+                        "filename": file.filename,
+                        "status": "success",
+                        "data": res["data"],
+                    }
+                )
             except HTTPException as e:
-                error_list.append({
-                    "filename": file.filename,
-                    "status": "failed",
-                    "reason": e.detail
-                })
+                error_list.append(
+                    {"filename": file.filename, "status": "failed", "reason": e.detail}
+                )
             except Exception as e:
-                error_list.append({
-                    "filename": file.filename,
-                    "status": "failed",
-                    "reason": str(e)
-                })
-                
+                error_list.append(
+                    {"filename": file.filename, "status": "failed", "reason": str(e)}
+                )
+
         return {
             "total": len(files),
             "success_count": len(success_list),
             "error_count": len(error_list),
-            "items": success_list + error_list
+            "items": success_list + error_list,
         }
-    
+
     @staticmethod
-    def get_list_documents(db: Session, page: int, limit: int, search_query: str = None):
+    def get_list_documents(
+        db: Session, page: int, limit: int, search_query: str = None
+    ):
 
         skip = (page - 1) * limit
-   
+
         query = db.query(Document)
 
         if search_query:
@@ -115,48 +118,56 @@ class DocumentService:
 
         total_records = query.count()
 
-        documents = query.order_by(desc(Document.created_at))\
-                         .offset(skip)\
-                         .limit(limit)\
-                         .all()
-        
+        documents = (
+            query.order_by(desc(Document.created_at)).offset(skip).limit(limit).all()
+        )
+
         import math
+
         total_pages = math.ceil(total_records / limit) if limit > 0 else 0
-    
+
         doc_schemas = [DocumentResponse.model_validate(doc) for doc in documents]
-    
+
         return {
             "items": doc_schemas,
             "pagination": {
                 "current_page": page,
                 "total_pages": total_pages,
                 "limit": limit,
-                "total_records": total_records
-            }
+                "total_records": total_records,
+            },
         }
-    
+
     @staticmethod
     async def process_document(db: Session, document_id: str, client_id: str = None):
         doc = db.query(Document).filter(Document.id == document_id).first()
         embed_model = get_embed_model(db)
         if not doc:
             if client_id:
-                await SSEService.send_alert(client_id, "Lỗi", "Tài liệu không tồn tại", "error")
+                await SSEService.send_alert(
+                    client_id, "Lỗi", "Tài liệu không tồn tại", "error"
+                )
             raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
-        
+
         return await DocumentService._ingest_document(db, doc, embed_model, client_id)
 
     @staticmethod
-    async def process_collection(db: Session, collection_id: str, client_id: str = None):
+    async def process_collection(
+        db: Session, collection_id: str, client_id: str = None
+    ):
         """Xử lý nạp toàn bộ tài liệu trong một collection (Bulk Ingest)"""
-        docs = db.query(Document)\
-                 .filter(Document.collection_id == collection_id)\
-                 .filter(Document.status.in_(["uploaded", "failed"]))\
-                 .all()
-        
+        docs = (
+            db.query(Document)
+            .filter(Document.collection_id == collection_id)
+            .filter(Document.status.in_(["uploaded", "failed"]))
+            .all()
+        )
+
         if not docs:
             if client_id:
-                await SSEService.send_alert(client_id, "Thông báo", "Không có tài liệu nào cần xử lý.", "info")
+                await SSEService.send_alert(
+                    client_id, "Thông báo", "Không có tài liệu nào cần xử lý.", "info"
+                )
             return {"message": "Không có tài liệu nào cần xử lý trong collection này."}
 
         embed_model = get_embed_model(db)
@@ -165,61 +176,78 @@ class DocumentService:
         total = len(docs)
 
         if client_id:
-            await SSEService.send_log(client_id, f"Bắt đầu xử lý bulk cho {total} tài liệu...", progress=0)
+            await SSEService.send_log(
+                client_id, f"Bắt đầu xử lý bulk cho {total} tài liệu...", progress=0
+            )
 
         for i, doc in enumerate(docs):
             try:
                 if client_id:
-                    await SSEService.send_log(client_id, f"Đang xử lý ({i+1}/{total}): {doc.doc_name}", progress=int((i/total)*100))
+                    await SSEService.send_log(
+                        client_id,
+                        f"Đang xử lý ({i+1}/{total}): {doc.doc_name}",
+                        progress=int((i / total) * 100),
+                    )
                 await DocumentService._ingest_document(db, doc, embed_model, client_id)
                 success_count += 1
             except Exception as e:
                 error_count += 1
                 if client_id:
-                    await SSEService.send_log(client_id, f"Lỗi file {doc.doc_name}: {str(e)}", status="error")
+                    await SSEService.send_log(
+                        client_id, f"Lỗi file {doc.doc_name}: {str(e)}", status="error"
+                    )
 
         if client_id:
             await SSEService.send_log(client_id, "Hoàn tất xử lý bulk.", progress=100)
-            await SSEService.send_alert(client_id, "Hoàn tất", f"Đã xử lý xong {success_count} tài liệu.", "success")
+            await SSEService.send_alert(
+                client_id,
+                "Hoàn tất",
+                f"Đã xử lý xong {success_count} tài liệu.",
+                "success",
+            )
 
         return {
             "message": f"Đã xử lý xong collection. Thành công: {success_count}, Thất bại: {error_count}",
-            "data": {
-                "total": total,
-                "success": success_count,
-                "failed": error_count
-            }
+            "data": {"total": total, "success": success_count, "failed": error_count},
         }
 
     @staticmethod
-    async def _ingest_document(db: Session, doc: Document, embed_model, client_id: str = None):
+    async def _ingest_document(
+        db: Session, doc: Document, embed_model, client_id: str = None
+    ):
         """Logic lõi để xử lý và nạp một tài liệu vào vector db"""
         if doc.status == "indexed" or doc.status == "sent":
             return {"message": "Tài liệu đã được xử lý từ trước."}
 
         if doc.status == "indexing":
-            raise HTTPException(status_code=400, detail="Tài liệu đang trong quá trình xử lý...")
+            raise HTTPException(
+                status_code=400, detail="Tài liệu đang trong quá trình xử lý..."
+            )
 
         try:
             if client_id:
-                await SSEService.send_log(client_id, f"Đang chuẩn bị nạp: {doc.doc_name}")
-            
+                await SSEService.send_log(
+                    client_id, f"Đang chuẩn bị nạp: {doc.doc_name}"
+                )
+
             doc.status = "indexing"
             db.commit()
 
             if not os.path.exists(doc.file_path):
                 raise FileNotFoundError(f"Không tìm thấy file: {doc.file_path}")
-            
+
             with open(doc.file_path, "rb") as f:
                 file_bytes = f.read()
 
             if client_id:
-                await SSEService.send_log(client_id, f"Đang trích xuất nội dung: {doc.doc_name}")
-            
+                await SSEService.send_log(
+                    client_id, f"Đang trích xuất nội dung: {doc.doc_name}"
+                )
+
             llama_docs = process_file_in_memory(doc.doc_name, file_bytes)
             if not llama_docs:
                 raise ValueError("Không thể trích xuất nội dung từ file")
-        
+
             # Lấy thông tin Collection để gán vào metadata
             collection_name = "N/A"
             if doc.collection_id:
@@ -229,14 +257,20 @@ class DocumentService:
 
             for llama_doc in llama_docs:
                 llama_doc.metadata["document_name"] = doc.doc_name
-                llama_doc.metadata["collection_id"] = str(doc.collection_id) if doc.collection_id else "N/A"
+                llama_doc.metadata["collection_id"] = (
+                    str(doc.collection_id) if doc.collection_id else "N/A"
+                )
                 llama_doc.metadata["category"] = collection_name
-                
-            all_nodes = DocumentService._node_parser.get_nodes_from_documents(llama_docs)
+
+            all_nodes = DocumentService._node_parser.get_nodes_from_documents(
+                llama_docs
+            )
             all_texts = [n.get_content() for n in all_nodes]
-            
+
             if client_id:
-                await SSEService.send_log(client_id, f"Đang tạo embedding ({len(all_texts)} chunks)...")
+                await SSEService.send_log(
+                    client_id, f"Đang tạo embedding ({len(all_texts)} chunks)..."
+                )
 
             # Batch embedding
             all_embeddings = embed_model.get_text_embedding_batch(all_texts)
@@ -244,7 +278,6 @@ class DocumentService:
             # Xóa các embedding cũ nếu có (re-index)
             db.query(Embedding).filter(Embedding.document_id == doc.id).delete()
 
-            
             embedding_records = []
             for i, node in enumerate(all_nodes):
                 parent_id = None
@@ -253,14 +286,16 @@ class DocumentService:
 
                 text_content = node.get_content()
                 vector_data = [float(x) for x in all_embeddings[i]]
-                
+
                 # Metadata cleaning
                 cleaned_metadata = {}
                 for k, v in node.metadata.items():
-                    if hasattr(v, "item"): 
+                    if hasattr(v, "item"):
                         cleaned_metadata[k] = v.item()
                     elif isinstance(v, list):
-                        cleaned_metadata[k] = [x.item() if hasattr(x, "item") else x for x in v]
+                        cleaned_metadata[k] = [
+                            x.item() if hasattr(x, "item") else x for x in v
+                        ]
                     else:
                         cleaned_metadata[k] = v
 
@@ -272,8 +307,8 @@ class DocumentService:
                     fts_vector=func.to_tsvector("simple", text_content),
                     node_id=node.node_id,
                     parent_node_id=parent_id,
-                    level=0, 
-                    chunk_size=len(text_content)
+                    level=0,
+                    chunk_size=len(text_content),
                 )
                 embedding_records.append(emb_record)
 
@@ -289,7 +324,7 @@ class DocumentService:
 
             return {
                 "message": f"Nạp tài liệu {doc.doc_name} thành công",
-                "status": "success"
+                "status": "success",
             }
 
         except Exception as e:
@@ -304,35 +339,35 @@ class DocumentService:
 
         if not doc:
             raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
-        
+
         new_doc = DocumentResponse.model_validate(doc)
 
         return new_doc
 
     def delete_document(db: Session, document_id: str):
         try:
-            
+
             doc = db.query(Document).filter(Document.id == document_id).first()
             if not doc:
                 raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
 
-            
             if os.path.exists(doc.file_path):
                 try:
                     os.remove(doc.file_path)
-                    
+
                 except Exception as e:
                     print(f"--- Lỗi khi xoá file vật lý: {e}")
-                    
+
             db.delete(doc)
             db.commit()
-            
+
             return {"message": "Xoá tài liệu thành công"}
 
         except Exception as e:
             db.rollback()
             print(f"Lỗi khi xoá tài liệu: {e}")
-            raise e        
+            raise e
+
 
 def calculate_file_hash(file: UploadFile) -> str:
     """
@@ -352,5 +387,3 @@ def calculate_file_hash(file: UploadFile) -> str:
     file.file.seek(0)
 
     return sha256_hash.hexdigest()
-
-        
