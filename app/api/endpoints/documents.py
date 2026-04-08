@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, status, Query
+from fastapi import APIRouter, Depends, UploadFile, File, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.auth.deps import RequireAdmin, RequireAdminOrUser
 from app.core.common.rate_limit import rate_limit_document_process
@@ -34,17 +34,22 @@ async def bulk_upload_documents(
         status_code=status.HTTP_201_CREATED,
     )
 
-@router.post("/{document_id}/process", status_code=status.HTTP_200_OK, summary="Xử lý tài liệu", tags=["Documents"])
+@router.post("/{document_id}/process", status_code=status.HTTP_202_ACCEPTED, summary="Xử lý tài liệu (SSE)", tags=["Documents"])
 async def process_document(
     document_id: str,
+    background_tasks: BackgroundTasks,
+    client_id: Optional[str] = Query(None, description="ID của SSE client để nhận log"),
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit_document_process),
     # _principal=RequireAdmin,
 ):
-    result = DocumentService.process_document(db, document_id)
+    # Đưa vào hàng đợi xử lý nền
+    background_tasks.add_task(DocumentService.process_document, db, document_id, client_id)
+    
     return APIResponse.success(
-        message=result["message"],
-        data=None
+        message="Yêu cầu xử lý đã được tiếp nhận. Vui lòng theo dõi tiến độ qua SSE.",
+        data={"client_id": client_id},
+        status_code=status.HTTP_202_ACCEPTED
     )
 
 @router.get("/", status_code=status.HTTP_200_OK, summary="Lấy danh sách tài liệu", tags=["Documents"])

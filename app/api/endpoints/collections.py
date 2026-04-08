@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, Query
+from fastapi import APIRouter, Depends, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.db.rag_database import get_db
 from app.services.collection_service import CollectionService
@@ -90,13 +90,18 @@ async def sync_documents(
         message=result["message"]
     )
 
-@router.post("/{collection_id}/process", status_code=status.HTTP_200_OK, summary="Nạp toàn bộ tài liệu trong collection (Bulk Ingest)", tags=["Collections"])
+@router.post("/{collection_id}/process", status_code=status.HTTP_202_ACCEPTED, summary="Nạp toàn bộ tài liệu trong collection (SSE)", tags=["Collections"])
 async def process_collection(
     collection_id: UUID,
+    background_tasks: BackgroundTasks,
+    client_id: Optional[str] = Query(None, description="ID của SSE client để nhận log"),
     db: Session = Depends(get_db)
 ):
-    result = DocumentService.process_collection(db, str(collection_id))
+    # Đưa vào hàng đợi xử lý nền
+    background_tasks.add_task(DocumentService.process_collection, db, str(collection_id), client_id)
+    
     return APIResponse.success(
-        message=result["message"],
-        data=result.get("data")
+        message="Yêu cầu xử lý Bulk Ingest đã được tiếp nhận. Vui lòng theo dõi tiến độ qua SSE.",
+        data={"client_id": client_id},
+        status_code=status.HTTP_202_ACCEPTED
     )

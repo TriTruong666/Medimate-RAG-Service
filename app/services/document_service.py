@@ -6,9 +6,10 @@ from fastapi import UploadFile, HTTPException
 from app.core.config import settings
 from app.services.model_loader import get_embed_model
 from sqlalchemy.orm import Session
-from app.models import Document, Embedding
+from app.models import Document, Embedding, Collection
 from app.schemas.document import DocumentResponse
 from app.services.file_service import process_file_in_memory
+from app.services.sse_service import SSEService
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import NodeRelationship, TextNode
 import re
@@ -135,16 +136,18 @@ class DocumentService:
         }
     
     @staticmethod
-    def process_document(db: Session, document_id: str):
+    async def process_document(db: Session, document_id: str, client_id: str = None):
         doc = db.query(Document).filter(Document.id == document_id).first()
         embed_model = get_embed_model(db)
         if not doc:
+            if client_id:
+                await SSEService.send_alert(client_id, "Lỗi", "Tài liệu không tồn tại", "error")
             raise HTTPException(status_code=404, detail="Tài liệu không tồn tại")
         
-        return DocumentService._ingest_document(db, doc, embed_model)
+        return await DocumentService._ingest_document(db, doc, embed_model, client_id)
 
     @staticmethod
-    def process_collection(db: Session, collection_id: str):
+    async def process_collection(db: Session, collection_id: str, client_id: str = None):
         """Xử lý nạp toàn bộ tài liệu trong một collection (Bulk Ingest)"""
         docs = db.query(Document)\
                  .filter(Document.collection_id == collection_id)\
@@ -152,33 +155,44 @@ class DocumentService:
                  .all()
         
         if not docs:
+            if client_id:
+                await SSEService.send_alert(client_id, "Thông báo", "Không có tài liệu nào cần xử lý.", "info")
             return {"message": "Không có tài liệu nào cần xử lý trong collection này."}
 
         embed_model = get_embed_model(db)
         success_count = 0
         error_count = 0
+        total = len(docs)
 
-        print(f"--- Bắt đầu xử lý bulk cho Collection {collection_id} ({len(docs)} tài liệu)...")
-        
-        for doc in docs:
+        if client_id:
+            await SSEService.send_log(client_id, f"Bắt đầu xử lý bulk cho {total} tài liệu...", progress=0)
+
+        for i, doc in enumerate(docs):
             try:
-                DocumentService._ingest_document(db, doc, embed_model)
+                if client_id:
+                    await SSEService.send_log(client_id, f"Đang xử lý ({i+1}/{total}): {doc.doc_name}", progress=int((i/total)*100))
+                await DocumentService._ingest_document(db, doc, embed_model, client_id)
                 success_count += 1
             except Exception as e:
                 error_count += 1
-                print(f"--- Lỗi khi xử lý file {doc.doc_name}: {e}")
+                if client_id:
+                    await SSEService.send_log(client_id, f"Lỗi file {doc.doc_name}: {str(e)}", status="error")
+
+        if client_id:
+            await SSEService.send_log(client_id, "Hoàn tất xử lý bulk.", progress=100)
+            await SSEService.send_alert(client_id, "Hoàn tất", f"Đã xử lý xong {success_count} tài liệu.", "success")
 
         return {
             "message": f"Đã xử lý xong collection. Thành công: {success_count}, Thất bại: {error_count}",
             "data": {
-                "total": len(docs),
+                "total": total,
                 "success": success_count,
                 "failed": error_count
             }
         }
 
     @staticmethod
-    def _ingest_document(db: Session, doc: Document, embed_model):
+    async def _ingest_document(db: Session, doc: Document, embed_model, client_id: str = None):
         """Logic lõi để xử lý và nạp một tài liệu vào vector db"""
         if doc.status == "indexed" or doc.status == "sent":
             return {"message": "Tài liệu đã được xử lý từ trước."}
@@ -187,6 +201,9 @@ class DocumentService:
             raise HTTPException(status_code=400, detail="Tài liệu đang trong quá trình xử lý...")
 
         try:
+            if client_id:
+                await SSEService.send_log(client_id, f"Đang chuẩn bị nạp: {doc.doc_name}")
+            
             doc.status = "indexing"
             db.commit()
 
@@ -196,22 +213,37 @@ class DocumentService:
             with open(doc.file_path, "rb") as f:
                 file_bytes = f.read()
 
+            if client_id:
+                await SSEService.send_log(client_id, f"Đang trích xuất nội dung: {doc.doc_name}")
+            
             llama_docs = process_file_in_memory(doc.doc_name, file_bytes)
             if not llama_docs:
                 raise ValueError("Không thể trích xuất nội dung từ file")
         
+            # Lấy thông tin Collection để gán vào metadata
+            collection_name = "N/A"
+            if doc.collection_id:
+                col = db.query(Collection).get(doc.collection_id)
+                if col:
+                    collection_name = col.name
+
             for llama_doc in llama_docs:
                 llama_doc.metadata["document_name"] = doc.doc_name
-                llama_doc.metadata["category"] = "medical_data"
+                llama_doc.metadata["collection_id"] = str(doc.collection_id) if doc.collection_id else "N/A"
+                llama_doc.metadata["category"] = collection_name
                 
             all_nodes = DocumentService._node_parser.get_nodes_from_documents(llama_docs)
             all_texts = [n.get_content() for n in all_nodes]
             
+            if client_id:
+                await SSEService.send_log(client_id, f"Đang tạo embedding ({len(all_texts)} chunks)...")
+
             # Batch embedding
             all_embeddings = embed_model.get_text_embedding_batch(all_texts)
 
             # Xóa các embedding cũ nếu có (re-index)
             db.query(Embedding).filter(Embedding.document_id == doc.id).delete()
+
             
             embedding_records = []
             for i, node in enumerate(all_nodes):

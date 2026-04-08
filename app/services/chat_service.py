@@ -11,14 +11,8 @@ class ChatService:
     @staticmethod
     def build_quick_reply(question: str):
         normalized_question = question.strip().lower()
-        greetings = {"hi", "hello", "helo", "hey", "chào", "xin chào", "bạn là ai", "ai đây", "tên gì", "bạn tên gì"}
         
-        if any(greet in normalized_question for greet in greetings):
-            return {
-                "answer": "Chào bạn! Tôi là Medimate AI - trợ lý ảo y tế thông minh. Tôi ở đây để hỗ trợ bạn giải đáp các thắc mắc về sức khỏe và y khoa. Bạn cần tôi giúp gì hôm nay?",
-                "sources": [],
-            }
-        
+        # Chỉ giữ lại những trường hợp cực kỳ ngắn hoặc rỗng, còn lại để RAG xử lý
         if not normalized_question or len(normalized_question) < 2:
             return {
                 "answer": "Chào bạn! Tôi có thể giúp gì cho bạn về vấn đề y khoa không?",
