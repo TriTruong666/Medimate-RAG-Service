@@ -16,7 +16,7 @@ import json
 from sqlalchemy import func
 
 class DocumentService:
-    file_types = ["pdf", "docx", "txt", "text", "doc", "json"]
+    file_types = ["pdf", "docx", "txt", "text", "doc", "json", "md"]
     # Medical-aware chunker: Chia chunk lớn tránh đứt gãy thực thể y khoa (thuốc - liều lượng)
     _node_parser = SentenceSplitter(chunk_size=1024, chunk_overlap=150, paragraph_separator="\n\n")
     @staticmethod
