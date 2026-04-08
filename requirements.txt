@@ -1,3 +1,6 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+sentence-transformers
 fastapi
 uvicorn
 python-multipart
@@ -7,7 +10,6 @@ llama-index-embeddings-huggingface
 llama-index-readers-file
 llama-index-vector-stores-postgres
 llama-index-llms-google-genai
-sentence-transformers
 pydantic-settings
 python-dotenv
 pypdf
@@ -20,6 +22,5 @@ alembic
 psycopg2-binary
 asyncpg
 pandas
-torch
 grpcio
 grpcio-tools

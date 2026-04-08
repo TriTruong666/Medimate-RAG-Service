@@ -3,17 +3,18 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Cài đặt công cụ build hệ thống
+# Cài đặt công cụ build hệ thống (Cần thiết cho llama-cpp và các thư viện C++)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     gcc \
+    python3-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
-# Cài thư viện vào thư mục /install để copy sang stage sau cho nhẹ
+# Cài thư viện vào thư mục /install
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
 
@@ -25,7 +26,7 @@ WORKDIR /app
 # Copy thư viện đã cài từ builder
 COPY --from=builder /install /usr/local
 
-# Cài runtime dependencies cho Postgres và Curl để healthcheck
+# Cài runtime dependencies (libpq5 cho postgres, curl cho healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
@@ -40,13 +41,11 @@ RUN mkdir -p data/raw_data app/models_weights logs seeds
 
 EXPOSE 2603
 
-# Healthcheck chuẩn Prod
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=3 \
     CMD curl -f http://localhost:2603/system/health || exit 1
 
-# Chạy bằng Gunicorn để quản lý worker tốt hơn
-CMD ["gunicorn", "main:app", \
-     "--workers", "2", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:2603", \
-     "--timeout", "120"]
+# Chạy trực tiếp bằng Uvicorn
+# --workers 2: Chạy 2 tiến trình song song
+# --loop httptools: Có thể thêm nếu muốn tối ưu hiệu năng (nhưng uvicorn mặc định đã rất tốt)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "2603", "--workers", "2"]
