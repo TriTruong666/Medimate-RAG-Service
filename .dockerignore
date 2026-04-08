@@ -1,18 +1,29 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Environments
+.env
+.env.*
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.python-version
 .venv/
 env/
 venv/
 ENV/
 virtual/
-
-# Environments
-.env
-.env.*
-!.env.example
+pip-log.txt
+pip-delete-this-directory.txt
 
 # OS
 .DS_Store
@@ -29,11 +40,6 @@ models_weights/
 seeds/
 logs/
 *.log
-
-# Docker
-# .dockerignore
-docker-compose.override.yml
-
-# Custom
-.zencoder
-.zenflow
+README.md
+docs/
+tests/

@@ -45,3 +45,9 @@ class Settings(BaseSettings):
     AUTH_GRPC_TIMEOUT_SECONDS: float = float(os.getenv("AUTH_GRPC_TIMEOUT_SECONDS", "2.0"))
 
 settings = Settings()
+
+# Ensure directories exist
+os.makedirs(settings.RAW_UPLOAD_PATH, exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "app", "models_weights"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "logs"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "seeds"), exist_ok=True)
