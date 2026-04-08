@@ -94,25 +94,19 @@ def get_engine(db, streaming: bool = True, ai_model_id: str = None):
     markdown_rules = """
 
 ====================
-QUY TẮC TRẢ LỜI VÀ ĐỊNH DẠNG BẮT BUỘC:
+QUY TẮC TRẢ LỜI VÀ ĐỊNH DẠNG:
 
-1. ĐỊNH DẠNG MARKDOWN CHUẨN:
-   - Sử dụng thẻ Heading (##, ###) để chia bố cục các phần rõ ràng.
-   - Sử dụng Bullet points (-) hoặc Numbered lists (1. 2. 3.) để liệt kê.
-   - In đậm (**từ khóa**) các ý chính hoặc cảnh báo quan trọng.
-   - Nếu có đoạn code, BẮT BUỘC phải đặt trong khối code block chuẩn (ví dụ: ```csharp ... ```).
-   - Phải xuống dòng rõ ràng (cách nhau 1 dòng trống) giữa các đoạn văn.
+1. ĐỊNH DẠNG MARKDOWN CHUYÊN NGHIỆP:
+   - Sử dụng thẻ Heading (##, ###) để phân chia các phần (ví dụ: Triệu chứng, Cách xử lý, Lưu ý y tế,...) một cách khoa học.
+   - Sử dụng Bullet points (-) hoặc Numbered lists (1. 2. 3.) để liệt kê các ý hoặc các bước thực hiện.
+   - In đậm (**từ khóa**) các thuật ngữ y tế quan trọng hoặc các cảnh báo sức khỏe cần đặc biệt lưu ý.
+   - Sử dụng bảng (Table) nếu cần so sánh thông tin hoặc liệt kê thông số.
+   - Đảm bảo có dòng trống giữa các đoạn văn và các phần để văn bản thoáng, dễ đọc trên di động.
 
-2. CÁCH TRÍCH DẪN (CITATIONS):
-   - TUYỆT ĐỐI KHÔNG chèn trực tiếp tên file vào nội dung bài viết (Cấm dùng kiểu: [Nguồn: abc.docx]).
-   - Khi tham khảo thông tin từ context, chỉ đánh số thứ tự trong ngoặc vuông ở cuối câu. Ví dụ: "...yêu cầu chứng chỉ SSL/TLS [1][2]."
-
-3. DANH SÁCH TÀI LIỆU THAM KHẢO:
-   - Ở dưới cùng của câu trả lời, bắt buộc tạo một mục "### Nguồn tham khảo:"
-   - Liệt kê lại các tài liệu đã dùng tương ứng với số thứ tự.
-   - Ví dụ format:
-     [1] To enable HTTPS on your server.docx
-     [2] Security_Guidelines.pdf
+2. PHONG CÁCH TRẢ LỜI:
+   - Trả lời trực tiếp, rõ ràng, tập trung vào giải đáp thắc mắc của người dùng.
+   - KHÔNG CẦN chèn trích dẫn, mã nguồn hoặc danh sách file tham khảo ở cuối bài.
+   - Ngôn ngữ thân thiện, chuyên nghiệp và phù hợp với vai trò trợ lý y tế Medimate.
 ====================
 """
     

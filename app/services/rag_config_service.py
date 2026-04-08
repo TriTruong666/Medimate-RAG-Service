@@ -92,67 +92,61 @@ class RagConfigService:
     @staticmethod
     def seed_config(db: Session):
         import json
-        seed_file = os.path.join(BASE_DIR, "seeds", "ai_model_seed.json")
+        model_seed_file = os.path.join(BASE_DIR, "seeds", "ai_model_seed.json")
+        config_seed_file = os.path.join(BASE_DIR, "seeds", "rag_config_seed.json")
         
-        if not os.path.exists(seed_file):
-            logger.warning(f"Không tìm thấy file seed: {seed_file}")
-            return
-
         try:
-            with open(seed_file, "r", encoding="utf-8") as f:
-                seed_data = json.load(f)
-            
-            default_model = None
+            default_model_id = None
 
-            # 1. Seed/Sync AI Models
-            for item in seed_data:
-                # Copy dữ liệu để tránh làm hỏng dict gốc
-                data = item.copy()
-                model_name = data.get("name")
-                is_default = data.pop("is_default", False)
-
-                # Tìm model cũ
-                llm = db.query(AIModel).filter(AIModel.name == model_name).first()
+            # 1. Seed/Sync AI Models từ file ai_model_seed.json
+            if os.path.exists(model_seed_file):
+                with open(model_seed_file, "r", encoding="utf-8") as f:
+                    model_seed_data = json.load(f)
                 
-                try:
+                for item in model_seed_data:
+                    data = item.copy()
+                    model_name = data.get("name")
+                    is_default = data.pop("is_default", False)
+
+                    llm = db.query(AIModel).filter(AIModel.name == model_name).first()
+                    
                     if not llm:
                         logger.info(f"Seeding AI Model mới: {model_name}")
                         llm = AIModel(**data)
                         db.add(llm)
+                        db.flush() 
                     else:
-                        # Update nếu đã tồn tại
                         for key, value in data.items():
                             setattr(llm, key, value)
-                        logger.info(f"Đã cập nhật cấu hình cho Model: {model_name}")
-                    
-                    # Flush riêng cho từng model để bắt lỗi ngay nếu trùng
-                    db.flush() 
-                    
-                except SQLAlchemyError as e:
-                    db.rollback() # Quan trọng: Rollback ngay nếu trùng
-                    logger.error(f"Lỗi khi seed model {model_name}: {e}")
-                    # Lấy lại instance sau khi rollback để xử lý tiếp
-                    llm = db.query(AIModel).filter(AIModel.name == model_name).first()
+                        db.flush()
 
-                if is_default:
-                    default_model = llm
-
-            # 2. Seed/Sync RagConfig mặc định
-            config = db.query(RagConfig).first()
-            if not config:
-                logger.info("Bắt đầu khởi tạo cấu hình RAG mặc định...")
-                config = RagConfig(
-                    name="Cấu hình y khoa mặc định",
-                    default_llm_id=default_model.id if default_model else None,
-                    top_k=5,
-                    threshold=0.4,
-                    temperature=0.1,
-                    prompt_template="..." # Giữ nguyên template của bạn
-                )
-                db.add(config)
+                    if is_default:
+                        default_model_id = llm.id
             else:
-                if default_model:
-                    config.default_llm_id = default_model.id
+                logger.warning(f"Không tìm thấy file seed AI Model: {model_seed_file}")
+
+            # 2. Seed/Sync RagConfig từ file rag_config_seed.json
+            if os.path.exists(config_seed_file):
+                with open(config_seed_file, "r", encoding="utf-8") as f:
+                    config_seed_data = json.load(f)
+                
+                config = db.query(RagConfig).first()
+                if not config:
+                    logger.info("Bắt đầu khởi tạo cấu hình RAG mặc định từ JSON...")
+                    config = RagConfig(
+                        **config_seed_data,
+                        default_llm_id=default_model_id
+                    )
+                    db.add(config)
+                else:
+                    # Cập nhật nếu đã tồn tại
+                    for key, value in config_seed_data.items():
+                        setattr(config, key, value)
+                    if default_model_id:
+                        config.default_llm_id = default_model_id
+                    logger.info("Đã cập nhật cấu hình RAG từ file JSON.")
+            else:
+                logger.warning(f"Không tìm thấy file seed RagConfig: {config_seed_file}")
             
             db.commit()
             logger.info("Hoàn tất quá trình đồng bộ dữ liệu Seed.")
