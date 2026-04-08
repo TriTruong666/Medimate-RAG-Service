@@ -60,7 +60,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "docker-compose.prod.yml"
-          target: "~/projects/medimate/server/rag/"
+          target: "~/projects/medimate/server/rag"
           strip_components: 0
 
       - name: Deploy to VPS via SSH
