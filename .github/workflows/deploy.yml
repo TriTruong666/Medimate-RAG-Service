@@ -61,6 +61,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "docker-compose.prod.yml"
           target: "~/projects/medimate/server/rag/"
+          strip_components: 0
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@master
