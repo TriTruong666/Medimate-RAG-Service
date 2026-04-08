@@ -1,0 +1,23 @@
+services:
+  medimate-api:
+    image: ghcr.io/tritruong666/medimate-rag-service:latest
+    container_name: medimate-rag-api
+    restart: always
+    env_file:
+      - .env.production
+    ports:
+      - "2603:2603"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./app/models_weights:/app/app/models_weights
+      - ./seeds:/app/seeds
+    networks:
+      - medimate-network
+      - web_network
+
+networks:
+  medimate-network:
+    external: true
+  web_network:
+    external: true
