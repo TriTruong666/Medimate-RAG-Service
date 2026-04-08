@@ -20,7 +20,8 @@ class Settings(BaseSettings):
 
     RAW_UPLOAD_PATH: str = os.path.join(BASE_DIR, "data", "raw_data")
 
-    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    EMBEDDING_MODEL: str = "Alibaba-NLP/gte-multilingual-base"
+    RERANKER_MODEL: str = "BAAI/bge-reranker-base"
 
     RAG_DB_URL: str = os.getenv("RAG_DB_URL")
 

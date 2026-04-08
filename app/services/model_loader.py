@@ -79,7 +79,8 @@ def get_embed_model(db: Session = None):
         device=device,
         model_name=model_name,
         cache_folder=os.path.join(os.getcwd(), "app", "models_weights"),
-        embed_batch_size=100
+        embed_batch_size=100,
+        trust_remote_code=True
     )
     return _embed_model
 
@@ -91,7 +92,7 @@ class MedicalReranker(BaseNodePostprocessor):
 
     def __init__(self, model_name: str, top_n: int = 3, device: str = "cpu"):
         super().__init__()
-        self._model = CrossEncoder(model_name, device=device)
+        self._model = CrossEncoder(model_name, device=device, trust_remote_code=True)
         self._top_n = top_n
 
     @classmethod
@@ -105,7 +106,7 @@ class MedicalReranker(BaseNodePostprocessor):
         query_str = query_bundle.query_str
         texts = [node.get_content() for node in nodes]
         
-        # BAAI/bge-reranker-v2-m3 returns raw similarity scores
+        # Reranker returns raw similarity scores
         # show_progress_bar=False để không hiện thanh load mỗi lần hỏi
         scores = self._model.predict([[query_str, text] for text in texts], show_progress_bar=False)
         
@@ -123,10 +124,12 @@ def get_reranker(db: Session = None):
         return _reranker
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Loading Reranker Model: BAAI/bge-reranker-v2-m3 on {device}")
+    model_name = settings.RERANKER_MODEL
+    
+    print(f"Loading Reranker Model: {model_name} on {device}")
     
     _reranker = MedicalReranker(
-        model_name="BAAI/bge-reranker-v2-m3", 
+        model_name=model_name, 
         top_n=3,
         device=device
     )

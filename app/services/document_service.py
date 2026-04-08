@@ -139,7 +139,7 @@ class DocumentService:
             # Tối ưu: Batch Embedding (Nhanh hơn gấp nhiều lần so với embed từng node)
             all_texts = [n.get_content() for n in all_nodes]
             
-            print(f"--- Đang tính toán Vector (BAAI/bge-m3) cho {len(all_nodes)} đoạn văn bản...")
+            print(f"--- Đang tính toán Vector ({settings.EMBEDDING_MODEL}) cho {len(all_nodes)} đoạn văn bản...")
             all_embeddings = embed_model.get_text_embedding_batch(all_texts)
             print(f"--- Đã tính toán xong toàn bộ Vector.")
 

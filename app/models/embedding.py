@@ -17,7 +17,7 @@ class Embedding(RagBase):
 
     text = Column(Text, nullable=False)
 
-    embedding = Column(Vector(1024), nullable=True) 
+    embedding = Column(Vector(768), nullable=True) 
 
     fts_vector = Column(TSVECTOR, nullable=True)
 

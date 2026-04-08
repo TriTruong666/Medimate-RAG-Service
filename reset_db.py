@@ -25,7 +25,7 @@ def reset_database():
         RagBase.metadata.create_all(bind=rag_engine)
         
         setup_database()
-        print("Đã khởi tạo database sạch thành công (1024 dim + fts_vector).")
+        print("Đã khởi tạo database sạch thành công.")
         
     except Exception as e:
         print(f"Lỗi khi reset database: {e}")
