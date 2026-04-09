@@ -15,6 +15,7 @@ from llama_index.core.schema import NodeRelationship, TextNode
 import re
 import json
 from sqlalchemy import func
+from uuid import UUID
 
 
 class DocumentService:
@@ -174,11 +175,14 @@ class DocumentService:
 
     @staticmethod
     def get_pending_documents(
-        db: Session, page: int, limit: int, search_query: str = None
+        db: Session, page: int, limit: int, search_query: str = None, collection_id: UUID = None
     ):
         skip = (page - 1) * limit
 
         query = db.query(Document).filter(Document.status.in_(["uploaded", "failed"]))
+
+        if collection_id:
+            query = query.filter(Document.collection_id == collection_id)
 
         if search_query:
             search = f"%{search_query}%"
