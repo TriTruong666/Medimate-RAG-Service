@@ -130,13 +130,23 @@ async def sync_documents(
 async def process_collection(
     collection_id: UUID,
     background_tasks: BackgroundTasks,
+    payload: Optional[CollectionDocumentsUpdate] = None,
     client_id: Optional[str] = Query(None, description="ID của SSE client để nhận log"),
     db: Session = Depends(get_db),
 ):
-    # Đưa vào hàng đợi xử lý nền
-    background_tasks.add_task(
-        DocumentService.process_collection, db, str(collection_id), client_id
-    )
+    # Nếu có truyền danh sách ID, chỉ xử lý những ID đó
+    if payload and payload.document_ids:
+        background_tasks.add_task(
+            DocumentService.bulk_process_documents, 
+            db, 
+            [str(uid) for uid in payload.document_ids], 
+            client_id
+        )
+    else:
+        # Ngược lại nạp toàn bộ collection
+        background_tasks.add_task(
+            DocumentService.process_collection, db, str(collection_id), client_id
+        )
 
     return APIResponse.success(
         message="Yêu cầu xử lý Bulk Ingest đã được tiếp nhận. Vui lòng theo dõi tiến độ qua SSE.",

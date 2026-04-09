@@ -4,8 +4,10 @@ from app.core.auth.deps import RequireAdmin, RequireAdminOrUser
 from app.core.common.rate_limit import rate_limit_document_process
 from app.core.db.rag_database import get_db
 from app.services.document_service import DocumentService
+from app.schemas.document import DocumentResponse, BulkProcessRequest
 from app.core.common.interceptor import APIResponse
 from typing import Optional
+from uuid import UUID
 
 router = APIRouter()
 
@@ -69,6 +71,32 @@ async def process_document(
 
     return APIResponse.success(
         message="Yêu cầu xử lý đã được tiếp nhận. Vui lòng theo dõi tiến độ qua SSE.",
+        data={"client_id": client_id},
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+
+
+@router.post(
+    "/bulk-process",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Xử lý nhiều tài liệu cùng lúc (SSE)",
+    tags=["Documents"],
+)
+async def bulk_process_documents(
+    payload: BulkProcessRequest,
+    background_tasks: BackgroundTasks,
+    client_id: Optional[str] = Query(None, description="ID của SSE client để nhận log"),
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit_document_process),
+    # _principal=RequireAdmin,
+):
+    # Đưa vào hàng đợi xử lý nền
+    background_tasks.add_task(
+        DocumentService.bulk_process_documents, db, [str(uid) for uid in payload.document_ids], client_id
+    )
+
+    return APIResponse.success(
+        message="Yêu cầu xử lý Bulk Ingest đã được tiếp nhận. Vui lòng theo dõi tiến độ qua SSE.",
         data={"client_id": client_id},
         status_code=status.HTTP_202_ACCEPTED,
     )
