@@ -75,6 +75,42 @@ async def process_document(
 
 
 @router.get(
+    "/pending",
+    status_code=status.HTTP_200_OK,
+    summary="Lấy danh sách tài liệu đang chờ xử lý",
+    tags=["Documents"],
+)
+async def pending_documents(
+    page: int = Query(1, ge=1, description="Trang hiện tại"),
+    limit: int = Query(10, ge=1, le=100, description="Số lượng mỗi trang"),
+    q: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo tên tài liệu"),
+    db: Session = Depends(get_db),
+    # _principal=RequireAdminOrUser,
+):
+    result = DocumentService.get_pending_documents(db, page, limit, q)
+
+    return APIResponse.success(message="Lấy danh sách thành công", data=result)
+
+
+@router.get(
+    "/uncollected",
+    status_code=status.HTTP_200_OK,
+    summary="Lấy danh sách tài liệu chưa có collection",
+    tags=["Documents"],
+)
+async def uncollected_documents(
+    page: int = Query(1, ge=1, description="Trang hiện tại"),
+    limit: int = Query(10, ge=1, le=100, description="Số lượng mỗi trang"),
+    q: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo tên tài liệu"),
+    db: Session = Depends(get_db),
+    # _principal=RequireAdminOrUser,
+):
+    result = DocumentService.get_uncollected_documents(db, page, limit, q)
+
+    return APIResponse.success(message="Lấy danh sách thành công", data=result)
+
+
+@router.get(
     "/",
     status_code=status.HTTP_200_OK,
     summary="Lấy danh sách tài liệu",

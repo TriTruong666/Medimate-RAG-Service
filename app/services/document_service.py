@@ -139,6 +139,74 @@ class DocumentService:
         }
 
     @staticmethod
+    def get_uncollected_documents(
+        db: Session, page: int, limit: int, search_query: str = None
+    ):
+        skip = (page - 1) * limit
+
+        query = db.query(Document).filter(Document.collection_id == None)
+
+        if search_query:
+            search = f"%{search_query}%"
+            query = query.filter(Document.doc_name.ilike(search))
+
+        total_records = query.count()
+
+        documents = (
+            query.order_by(desc(Document.created_at)).offset(skip).limit(limit).all()
+        )
+
+        import math
+
+        total_pages = math.ceil(total_records / limit) if limit > 0 else 0
+
+        doc_schemas = [DocumentResponse.model_validate(doc) for doc in documents]
+
+        return {
+            "items": doc_schemas,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "total_records": total_records,
+            },
+        }
+
+    @staticmethod
+    def get_pending_documents(
+        db: Session, page: int, limit: int, search_query: str = None
+    ):
+        skip = (page - 1) * limit
+
+        query = db.query(Document).filter(Document.status.in_(["uploaded", "failed"]))
+
+        if search_query:
+            search = f"%{search_query}%"
+            query = query.filter(Document.doc_name.ilike(search))
+
+        total_records = query.count()
+
+        documents = (
+            query.order_by(desc(Document.created_at)).offset(skip).limit(limit).all()
+        )
+
+        import math
+
+        total_pages = math.ceil(total_records / limit) if limit > 0 else 0
+
+        doc_schemas = [DocumentResponse.model_validate(doc) for doc in documents]
+
+        return {
+            "items": doc_schemas,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "total_records": total_records,
+            },
+        }
+
+    @staticmethod
     async def process_document(db: Session, document_id: str, client_id: str = None):
         doc = db.query(Document).filter(Document.id == document_id).first()
         embed_model = get_embed_model(db)
