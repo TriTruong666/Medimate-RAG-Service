@@ -235,10 +235,16 @@ class DocumentService:
             .all()
         )
 
+        # Lấy thông tin collection để hiển thị log
+        collection_name = "Unknown"
+        collection = db.query(Collection).filter(Collection.id == collection_id).first()
+        if collection:
+            collection_name = collection.name
+
         if not docs:
             if client_id:
                 await SSEService.send_alert(
-                    client_id, "Thông báo", "Không có tài liệu nào cần xử lý.", "info"
+                    client_id, "Thông báo", f"[{collection_name}]: Không có tài liệu nào cần xử lý.", "info"
                 )
             return {"message": "Không có tài liệu nào cần xử lý trong collection này."}
 
@@ -249,7 +255,7 @@ class DocumentService:
 
         if client_id:
             await SSEService.send_log(
-                client_id, f"Bắt đầu xử lý bulk cho {total} tài liệu...", progress=0
+                client_id, f"[{collection_name}]: Bắt đầu xử lý bulk cho {total} tài liệu...", progress=0
             )
 
         for i, doc in enumerate(docs):
@@ -257,7 +263,7 @@ class DocumentService:
                 if client_id:
                     await SSEService.send_log(
                         client_id,
-                        f"Đang xử lý ({i+1}/{total}): {doc.doc_name}",
+                        f"[{collection_name}]: Đang xử lý ({i+1}/{total}): {doc.doc_name}",
                         progress=int((i / total) * 100),
                     )
                 await DocumentService._ingest_document(db, doc, embed_model, client_id)
@@ -266,11 +272,11 @@ class DocumentService:
                 error_count += 1
                 if client_id:
                     await SSEService.send_log(
-                        client_id, f"Lỗi file {doc.doc_name}: {str(e)}", status="error"
+                        client_id, f"[{collection_name}]: Lỗi file {doc.doc_name}: {str(e)}", status="error"
                     )
 
         if client_id:
-            await SSEService.send_log(client_id, "Hoàn tất xử lý bulk.", progress=100)
+            await SSEService.send_log(client_id, f"[{collection_name}]: Hoàn tất xử lý bulk.", progress=100)
             await SSEService.send_alert(
                 client_id,
                 "Hoàn tất",
@@ -314,9 +320,16 @@ class DocumentService:
         for i, doc in enumerate(docs):
             try:
                 if client_id:
+                    # Lấy tên collection cho mỗi file (vì bulk by IDs có thể mix)
+                    col_name = "N/A"
+                    if doc.collection_id:
+                        col = db.query(Collection).filter(Collection.id == doc.collection_id).first()
+                        if col:
+                            col_name = col.name
+                    
                     await SSEService.send_log(
                         client_id,
-                        f"Đang xử lý ({i+1}/{total}): {doc.doc_name}",
+                        f"[{col_name}]: Đang xử lý ({i+1}/{total}): {doc.doc_name}",
                         progress=int((i / total) * 100),
                     )
                 await DocumentService._ingest_document(db, doc, embed_model, client_id)
@@ -355,10 +368,19 @@ class DocumentService:
                 status_code=400, detail="Tài liệu đang trong quá trình xử lý..."
             )
 
+        # Lấy tên collection ngay từ đầu để làm prefix cho log
+        collection_name = "N/A"
+        if doc.collection_id:
+            col = db.query(Collection).filter(Collection.id == doc.collection_id).first()
+            if col:
+                collection_name = col.name
+        
+        log_prefix = f"[{collection_name}]"
+
         try:
             if client_id:
                 await SSEService.send_log(
-                    client_id, f"Đang chuẩn bị nạp: {doc.doc_name}"
+                    client_id, f"{log_prefix}: Đang chuẩn bị nạp: {doc.doc_name}"
                 )
 
             doc.status = "indexing"
@@ -372,19 +394,15 @@ class DocumentService:
 
             if client_id:
                 await SSEService.send_log(
-                    client_id, f"Đang trích xuất nội dung: {doc.doc_name}"
+                    client_id, f"{log_prefix}: Đang trích xuất nội dung: {doc.doc_name}"
                 )
 
             llama_docs = process_file_in_memory(doc.doc_name, file_bytes)
             if not llama_docs:
                 raise ValueError("Không thể trích xuất nội dung từ file")
 
-            # Lấy thông tin Collection để gán vào metadata
-            collection_name = "N/A"
-            if doc.collection_id:
-                col = db.query(Collection).get(doc.collection_id)
-                if col:
-                    collection_name = col.name
+            # Đã có collection_name từ trên
+            # metadata gán sau...
 
             for llama_doc in llama_docs:
                 llama_doc.metadata["document_name"] = doc.doc_name
@@ -400,7 +418,7 @@ class DocumentService:
 
             if client_id:
                 await SSEService.send_log(
-                    client_id, f"Đang tạo embedding ({len(all_texts)} chunks)..."
+                    client_id, f"{log_prefix}: Đang tạo embedding ({len(all_texts)} chunks)..."
                 )
 
             # Batch embedding

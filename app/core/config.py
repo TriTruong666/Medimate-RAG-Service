@@ -56,7 +56,7 @@ class Settings(BaseSettings):
         os.getenv("AUTH_GRPC_TIMEOUT_SECONDS", "2.0")
     )
     # Quan trọng chỉ reset DB khi dev, prod khi cần thiết và thêm bảng hoặc sửa bảng
-    IS_RESET_DB: bool = os.getenv("IS_RESET_DB", "True").lower() in ("true", "1", "t")
+    IS_RESET_DB: bool = os.getenv("IS_RESET_DB", "False").lower() in ("true", "1", "t")
 
 
 settings = Settings()
