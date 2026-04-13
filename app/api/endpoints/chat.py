@@ -27,7 +27,7 @@ def get_cached_engine(ai_model_id: str = None):
 
 @router.post("/preload", summary="Preload Chat Engine", tags=["Chat"])
 async def preload_chat_engine(
-    # _principal=RequireAdminOrUser,
+    _principal=RequireAdminOrUser,
 ):
     global _completion_engine_cache
     was_ready = "default" in _completion_engine_cache
@@ -62,7 +62,7 @@ async def preload_chat_engine(
 def chat_completion(
     req: ChatRequest,
     _: None = Depends(rate_limit_chat_completion),
-    # _principal=RequireAdminOrUser,
+    _principal=RequireAdminOrUser,
 ):
     quick_reply = ChatService.build_quick_reply(req.question)
     if quick_reply is not None:

@@ -19,7 +19,7 @@ router = APIRouter()
 async def upload_document(
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
-    # _principal=RequireAdmin,
+    _principal=RequireAdmin,
 ):
     result = DocumentService.save_upload_file(db, file, file.filename)
     return APIResponse.success(
@@ -38,7 +38,7 @@ async def upload_document(
 async def bulk_upload_documents(
     db: Session = Depends(get_db),
     files: list[UploadFile] = File(...),
-    # _principal=RequireAdmin,
+    _principal=RequireAdmin,
 ):
     result = DocumentService.bulk_save_upload_files(db, files)
     return APIResponse.success(
@@ -60,7 +60,7 @@ async def process_document(
     client_id: Optional[str] = Query(None, description="ID của SSE client để nhận log"),
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit_document_process),
-    # _principal=RequireAdmin,
+    _principal=RequireAdmin,
 ):
     # Đưa vào hàng đợi xử lý nền
     background_tasks.add_task(
@@ -85,7 +85,7 @@ async def list_documents(
     limit: int = Query(10, ge=1, le=100, description="Số lượng mỗi trang"),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo tên tài liệu"),
     db: Session = Depends(get_db),
-    # _principal=RequireAdminOrUser,
+    _principal=RequireAdminOrUser,
 ):
     result = DocumentService.get_list_documents(db, page, limit, q)
 
@@ -101,7 +101,7 @@ async def list_documents(
 async def get_document(
     document_id: str,
     db: Session = Depends(get_db),
-    # _principal=RequireAdminOrUser,
+    _principal=RequireAdminOrUser,
 ):
     result = DocumentService.get_document_by_id(db, document_id)
     return APIResponse.success(message="Lấy thông tin tài liệu thành công", data=result)
@@ -116,7 +116,7 @@ async def get_document(
 async def delete_document(
     document_id: str,
     db: Session = Depends(get_db),
-    # _principal=RequireAdmin,
+    _principal=RequireAdmin,
 ):
     result = DocumentService.delete_document(db, document_id)
     return APIResponse.success(message=result["message"], data=None)
