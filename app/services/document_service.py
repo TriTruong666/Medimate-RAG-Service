@@ -15,6 +15,7 @@ from llama_index.core.schema import NodeRelationship, TextNode
 import re
 import json
 from sqlalchemy import func
+from uuid import UUID
 
 
 class DocumentService:
@@ -139,6 +140,77 @@ class DocumentService:
         }
 
     @staticmethod
+    def get_uncollected_documents(
+        db: Session, page: int, limit: int, search_query: str = None
+    ):
+        skip = (page - 1) * limit
+
+        query = db.query(Document).filter(Document.collection_id == None)
+
+        if search_query:
+            search = f"%{search_query}%"
+            query = query.filter(Document.doc_name.ilike(search))
+
+        total_records = query.count()
+
+        documents = (
+            query.order_by(desc(Document.created_at)).offset(skip).limit(limit).all()
+        )
+
+        import math
+
+        total_pages = math.ceil(total_records / limit) if limit > 0 else 0
+
+        doc_schemas = [DocumentResponse.model_validate(doc) for doc in documents]
+
+        return {
+            "items": doc_schemas,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "total_records": total_records,
+            },
+        }
+
+    @staticmethod
+    def get_pending_documents(
+        db: Session, page: int, limit: int, search_query: str = None, collection_id: UUID = None
+    ):
+        skip = (page - 1) * limit
+
+        query = db.query(Document).filter(Document.status.in_(["uploaded", "failed"]))
+
+        if collection_id:
+            query = query.filter(Document.collection_id == collection_id)
+
+        if search_query:
+            search = f"%{search_query}%"
+            query = query.filter(Document.doc_name.ilike(search))
+
+        total_records = query.count()
+
+        documents = (
+            query.order_by(desc(Document.created_at)).offset(skip).limit(limit).all()
+        )
+
+        import math
+
+        total_pages = math.ceil(total_records / limit) if limit > 0 else 0
+
+        doc_schemas = [DocumentResponse.model_validate(doc) for doc in documents]
+
+        return {
+            "items": doc_schemas,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "limit": limit,
+                "total_records": total_records,
+            },
+        }
+
+    @staticmethod
     async def process_document(db: Session, document_id: str, client_id: str = None):
         doc = db.query(Document).filter(Document.id == document_id).first()
         embed_model = get_embed_model(db)
@@ -208,6 +280,65 @@ class DocumentService:
 
         return {
             "message": f"Đã xử lý xong collection. Thành công: {success_count}, Thất bại: {error_count}",
+            "data": {"total": total, "success": success_count, "failed": error_count},
+        }
+
+    @staticmethod
+    async def bulk_process_documents(
+        db: Session, document_ids: list[str], client_id: str = None
+    ):
+        """Xử lý nạp danh sách tài liệu được chọn (Bulk Ingest by IDs)"""
+        docs = (
+            db.query(Document)
+            .filter(Document.id.in_(document_ids))
+            .all()
+        )
+
+        if not docs:
+            if client_id:
+                await SSEService.send_alert(
+                    client_id, "Thông báo", "Không tìm thấy tài liệu nào để xử lý.", "info"
+                )
+            return {"message": "Không tìm thấy tài liệu nào để xử lý."}
+
+        embed_model = get_embed_model(db)
+        success_count = 0
+        error_count = 0
+        total = len(docs)
+
+        if client_id:
+            await SSEService.send_log(
+                client_id, f"Bắt đầu xử lý bulk cho {total} tài liệu...", progress=0
+            )
+
+        for i, doc in enumerate(docs):
+            try:
+                if client_id:
+                    await SSEService.send_log(
+                        client_id,
+                        f"Đang xử lý ({i+1}/{total}): {doc.doc_name}",
+                        progress=int((i / total) * 100),
+                    )
+                await DocumentService._ingest_document(db, doc, embed_model, client_id)
+                success_count += 1
+            except Exception as e:
+                error_count += 1
+                if client_id:
+                    await SSEService.send_log(
+                        client_id, f"Lỗi file {doc.doc_name}: {str(e)}", status="error"
+                    )
+
+        if client_id:
+            await SSEService.send_log(client_id, "Hoàn tất xử lý bulk.", progress=100)
+            await SSEService.send_alert(
+                client_id,
+                "Hoàn tất",
+                f"Đã xử lý xong {success_count} tài liệu.",
+                "success",
+            )
+
+        return {
+            "message": f"Đã xử lý xong danh sách. Thành công: {success_count}, Thất bại: {error_count}",
             "data": {"total": total, "success": success_count, "failed": error_count},
         }
 

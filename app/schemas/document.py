@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional, List
@@ -23,3 +23,6 @@ class PaginationSchema(BaseModel):
 class DocumentListResponse(BaseModel):
     items: List[DocumentResponse]
     pagination: PaginationSchema
+
+class BulkProcessRequest(BaseModel):
+    document_ids: List[UUID] = Field(..., description="Danh sách ID tài liệu cần xử lý")
