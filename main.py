@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 import uvicorn
+import time
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 from app.core.db.rag_database import SessionLocal
@@ -26,6 +27,8 @@ from app.models import Document, Embedding, RagConfig, Collection
 
 # API routes
 from app.api.routes import router as api_router
+
+START_TIME = time.time()
 
 # Setup logger
 logging.basicConfig(level=logging.INFO)
@@ -164,16 +167,41 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/system/health", tags=["Health Check"])
 async def root():
+    uptime_seconds = int(time.time() - START_TIME)
+
+    # Format uptime
+    days, rem = divmod(uptime_seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, seconds = divmod(rem, 60)
+
+    uptime_str = (
+        f"{days}d {hours}h {minutes}m {seconds}s"
+        if days > 0
+        else f"{hours}h {minutes}m {seconds}s"
+    )
+
     return APIResponse.success(
         message="Server đang hoạt động bình thường",
-        data={"version": settings.APP_VERSION, "author": settings.AUTHOR_NAME},
+        data={
+            "version": settings.APP_VERSION,
+            "author": settings.AUTHOR_NAME,
+            "uptime_seconds": uptime_seconds,
+            "uptime_human": uptime_str,
+        },
     )
 
 
 def main():
     print_banner()
 
-    uvicorn.run("main:app", port=settings.APP_PORT, host=settings.APP_HOST, reload=True)
+    uvicorn.run(
+        "main:app",
+        port=settings.APP_PORT,
+        host=settings.APP_HOST,
+        reload=True,
+        reload_dirs=["."],  # Chỉ định rõ thư mục quét
+        timeout_keep_alive=5,  # Giảm thời gian đợi kết nối cũ
+    )
 
 
 if __name__ == "__main__":

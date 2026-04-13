@@ -113,6 +113,22 @@ async def assign_documents(
     return APIResponse.success(message=result["message"])
 
 
+@router.post(
+    "/{collection_id}/remove-documents",
+    status_code=status.HTTP_200_OK,
+    summary="Gỡ danh sách tài liệu khỏi collection",
+    tags=["Collections"],
+    dependencies=[RequireAdmin],
+)
+async def remove_documents(
+    collection_id: UUID,
+    payload: CollectionDocumentsUpdate,
+    db: Session = Depends(get_db),
+):
+    result = CollectionService.remove_documents(db, collection_id, payload.document_ids)
+    return APIResponse.success(message=result["message"])
+
+
 @router.put(
     "/{collection_id}/documents",
     status_code=status.HTTP_200_OK,

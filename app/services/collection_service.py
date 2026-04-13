@@ -132,3 +132,17 @@ class CollectionService:
 
         db.commit()
         return {"message": "Đã cập nhật chính xác danh sách tài liệu trong collection"}
+
+    @staticmethod
+    def remove_documents(db: Session, collection_id: UUID, document_ids: List[UUID]):
+        """Gỡ bỏ danh sách tài liệu khỏi collection."""
+        # Kiểm tra collection tồn tại
+        CollectionService.get_collection_by_id(db, collection_id)
+
+        # Cập nhật collection_id = None cho những docs này nếu chúng đang thuộc về collection này
+        db.query(Document).filter(
+            Document.collection_id == collection_id, Document.id.in_(document_ids)
+        ).update({Document.collection_id: None}, synchronize_session=False)
+
+        db.commit()
+        return {"message": f"Đã gỡ {len(document_ids)} tài liệu khỏi collection"}
