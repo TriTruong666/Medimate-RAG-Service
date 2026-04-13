@@ -25,10 +25,8 @@ def get_cached_engine(ai_model_id: str = None):
     return _completion_engine_cache[cache_key]
 
 
-@router.post("/preload", summary="Preload Chat Engine", tags=["Chat"])
-async def preload_chat_engine(
-    _principal=RequireAdminOrUser,
-):
+@router.post("/preload", summary="Preload Chat Engine", tags=["Chat"], dependencies=[RequireAdminOrUser])
+async def preload_chat_engine():
     global _completion_engine_cache
     was_ready = "default" in _completion_engine_cache
     started_at = time.perf_counter()
@@ -58,11 +56,10 @@ async def preload_chat_engine(
 #     )
 
 
-@router.post("/completion", summary="Chat với Model LLM (Non-Streaming)", tags=["Chat"])
+@router.post("/completion", summary="Chat với Model LLM (Non-Streaming)", tags=["Chat"], dependencies=[RequireAdminOrUser])
 def chat_completion(
     req: ChatRequest,
     _: None = Depends(rate_limit_chat_completion),
-    _principal=RequireAdminOrUser,
 ):
     quick_reply = ChatService.build_quick_reply(req.question)
     if quick_reply is not None:

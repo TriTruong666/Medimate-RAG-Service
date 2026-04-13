@@ -17,11 +17,11 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="Upload tài liệu",
     tags=["Documents"],
+    dependencies=[RequireAdmin],
 )
 async def upload_document(
     db: Session = Depends(get_db),
     file: UploadFile = File(...),
-    _principal=RequireAdmin,
 ):
     result = DocumentService.save_upload_file(db, file, file.filename)
     return APIResponse.success(
@@ -36,11 +36,11 @@ async def upload_document(
     status_code=status.HTTP_201_CREATED,
     summary="Upload nhiều tài liệu",
     tags=["Documents"],
+    dependencies=[RequireAdmin],
 )
 async def bulk_upload_documents(
     db: Session = Depends(get_db),
     files: list[UploadFile] = File(...),
-    _principal=RequireAdmin,
 ):
     result = DocumentService.bulk_save_upload_files(db, files)
     return APIResponse.success(
@@ -55,6 +55,7 @@ async def bulk_upload_documents(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Xử lý tài liệu (SSE)",
     tags=["Documents"],
+    dependencies=[RequireAdmin],
 )
 async def process_document(
     document_id: str,
@@ -62,7 +63,6 @@ async def process_document(
     client_id: Optional[str] = Query(None, description="ID của SSE client để nhận log"),
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit_document_process),
-    _principal=RequireAdmin,
 ):
     # Đưa vào hàng đợi xử lý nền
     background_tasks.add_task(
@@ -144,13 +144,13 @@ async def uncollected_documents(
     status_code=status.HTTP_200_OK,
     summary="Lấy danh sách tài liệu",
     tags=["Documents"],
+    dependencies=[RequireAdminOrUser],
 )
 async def list_documents(
     page: int = Query(1, ge=1, description="Trang hiện tại"),
     limit: int = Query(10, ge=1, le=100, description="Số lượng mỗi trang"),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm theo tên tài liệu"),
     db: Session = Depends(get_db),
-    _principal=RequireAdminOrUser,
 ):
     result = DocumentService.get_list_documents(db, page, limit, q)
 
@@ -162,11 +162,11 @@ async def list_documents(
     status_code=status.HTTP_200_OK,
     summary="Lấy thông tin tài liệu",
     tags=["Documents"],
+    dependencies=[RequireAdminOrUser],
 )
 async def get_document(
     document_id: str,
     db: Session = Depends(get_db),
-    _principal=RequireAdminOrUser,
 ):
     result = DocumentService.get_document_by_id(db, document_id)
     return APIResponse.success(message="Lấy thông tin tài liệu thành công", data=result)
@@ -177,11 +177,11 @@ async def get_document(
     status_code=status.HTTP_200_OK,
     summary="Xoá tài liệu (bao gồm dữ liệu đã embedded)",
     tags=["Documents"],
+    dependencies=[RequireAdmin],
 )
 async def delete_document(
     document_id: str,
     db: Session = Depends(get_db),
-    _principal=RequireAdmin,
 ):
     result = DocumentService.delete_document(db, document_id)
     return APIResponse.success(message=result["message"], data=None)

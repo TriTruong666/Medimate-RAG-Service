@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.db.rag_database import get_db
+from app.core.auth.deps import RequireAdmin
 from app.schemas.ai_model import AIModelCreate, AIModelUpdate
 from app.services.ai_model_service import AIModelService
 from app.core.common.interceptor import APIResponse
@@ -15,6 +16,7 @@ router = APIRouter()
     "/",
     summary="Lấy danh sách AI Model",
     description="Truy xuất toàn bộ danh sách AI Model đang có trong hệ thống, hỗ trợ phân trang.",
+    dependencies=[RequireAdmin],
 )
 def get_ai_models(
     skip: int = Query(0, description="Bỏ qua N kết quả đầu tiên"),
@@ -29,6 +31,7 @@ def get_ai_models(
     "/{model_id}",
     summary="Lấy chi tiết AI Model",
     description="Tra cứu thông tin cấu hình chi tiết của một AI Model dựa trên UUID của nó.",
+    dependencies=[RequireAdmin],
 )
 def get_ai_model(
     model_id: UUID,
@@ -43,6 +46,7 @@ def get_ai_model(
     status_code=status.HTTP_201_CREATED,
     summary="Tạo mới AI Model",
     description="Thêm một model AI mới vào database, lưu cấu hình API hoặc config cục bộ dưới dạng JSON.",
+    dependencies=[RequireAdmin],
 )
 def create_ai_model(
     payload: AIModelCreate,
@@ -60,6 +64,7 @@ def create_ai_model(
     "/{model_id}",
     summary="Cập nhật AI Model",
     description="Cập nhật một phần (Patch) cho AI Model cụ thể. Bạn có thể thay token API ở đây.",
+    dependencies=[RequireAdmin],
 )
 def update_ai_model(
     model_id: UUID,
@@ -75,6 +80,7 @@ def update_ai_model(
     status_code=status.HTTP_200_OK,
     summary="Xoá AI Model",
     description="Xoá một model khỏi database. Lưu ý sẽ gặp lỗi nếu model này đang được ưu tiên set trong bảng RAG config.",
+    dependencies=[RequireAdmin],
 )
 def delete_ai_model(
     model_id: UUID,

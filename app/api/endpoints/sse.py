@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from app.services.sse_service import SSEService
+from app.core.auth.deps import RequireAdmin, RequireAdminOrUser
 import uuid
 
 router = APIRouter()
 
 
-@router.get("/stream/{client_id}", summary="Kết nối SSE Stream", tags=["SSE"])
+@router.get("/stream/{client_id}", summary="Kết nối SSE Stream", tags=["SSE"], dependencies=[RequireAdminOrUser])
 async def sse_endpoint(request: Request, client_id: str):
     """
     Endpoint duy trì kết nối SSE. FE sẽ kết nối vào đây qua EventSource.
@@ -16,7 +17,7 @@ async def sse_endpoint(request: Request, client_id: str):
     )
 
 
-@router.post("/test-event", summary="Test SSE Event (Dành cho Dev)", tags=["SSE"])
+@router.post("/test-event", summary="Test SSE Event (Dành cho Dev)", tags=["SSE"], dependencies=[RequireAdmin])
 async def test_sse_event(client_id: str, message: str):
     """Bắn thử một log message để kiểm tra kết nối."""
     await SSEService.send_log(client_id, f"Test log: {message}", progress=50)
@@ -25,7 +26,7 @@ async def test_sse_event(client_id: str, message: str):
 
 
 @router.post(
-    "/send-notification", summary="Gửi thông báo trực tiếp qua SSE", tags=["SSE"]
+    "/send-notification", summary="Gửi thông báo trực tiếp qua SSE", tags=["SSE"], dependencies=[RequireAdmin]
 )
 async def send_notification(
     client_id: str, title: str, message: str, alert_type: str = "info"

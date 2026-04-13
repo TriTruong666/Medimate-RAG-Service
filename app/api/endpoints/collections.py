@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.db.rag_database import get_db
+from app.core.auth.deps import RequireAdmin, RequireAdminOrUser
 from app.services.collection_service import CollectionService
 from app.services.document_service import DocumentService
 from app.schemas.collection import (
@@ -21,6 +22,7 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="Tạo mới collection",
     tags=["Collections"],
+    dependencies=[RequireAdmin],
 )
 async def create_collection(
     collection_in: CollectionCreate, db: Session = Depends(get_db)
@@ -38,6 +40,7 @@ async def create_collection(
     status_code=status.HTTP_200_OK,
     summary="Lấy danh sách collection",
     tags=["Collections"],
+    dependencies=[RequireAdminOrUser],
 )
 async def list_collections(
     page: int = Query(1, ge=1, description="Trang hiện tại"),
@@ -57,6 +60,7 @@ async def list_collections(
     status_code=status.HTTP_200_OK,
     summary="Lấy chi tiết collection",
     tags=["Collections"],
+    dependencies=[RequireAdminOrUser],
 )
 async def get_collection(collection_id: UUID, db: Session = Depends(get_db)):
     result = CollectionService.get_collection_by_id(db, collection_id)
@@ -72,6 +76,7 @@ async def get_collection(collection_id: UUID, db: Session = Depends(get_db)):
     status_code=status.HTTP_200_OK,
     summary="Cập nhật collection",
     tags=["Collections"],
+    dependencies=[RequireAdmin],
 )
 async def update_collection(
     collection_id: UUID, collection_in: CollectionUpdate, db: Session = Depends(get_db)
@@ -85,6 +90,7 @@ async def update_collection(
     status_code=status.HTTP_200_OK,
     summary="Xóa collection",
     tags=["Collections"],
+    dependencies=[RequireAdmin],
 )
 async def delete_collection(collection_id: UUID, db: Session = Depends(get_db)):
     result = CollectionService.delete_collection(db, collection_id)
@@ -96,6 +102,7 @@ async def delete_collection(collection_id: UUID, db: Session = Depends(get_db)):
     status_code=status.HTTP_200_OK,
     summary="Gán danh sách tài liệu vào collection (bổ sung)",
     tags=["Collections"],
+    dependencies=[RequireAdmin],
 )
 async def assign_documents(
     collection_id: UUID,
@@ -111,6 +118,7 @@ async def assign_documents(
     status_code=status.HTTP_200_OK,
     summary="Cập nhật/Sửa danh sách tài liệu trong collection (thay thế)",
     tags=["Collections"],
+    dependencies=[RequireAdmin],
 )
 async def sync_documents(
     collection_id: UUID,
@@ -126,6 +134,7 @@ async def sync_documents(
     status_code=status.HTTP_202_ACCEPTED,
     summary="Nạp toàn bộ tài liệu trong collection (SSE)",
     tags=["Collections"],
+    dependencies=[RequireAdmin],
 )
 async def process_collection(
     collection_id: UUID,

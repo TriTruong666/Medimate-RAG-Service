@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     AUTHOR_NAME: str = "TriTruong666"
 
     APP_VERSION: str = "1.0.0"
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "dev")
 
     APP_PORT: int = os.getenv("APP_PORT")
 
