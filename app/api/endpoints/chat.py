@@ -57,7 +57,7 @@ async def preload_chat_engine():
 
 
 @router.post("/completion", summary="Chat với Model LLM (Non-Streaming)", tags=["Chat"], dependencies=[RequireAdminOrUser])
-def chat_completion(
+async def chat_completion(
     req: ChatRequest,
     _: None = Depends(rate_limit_chat_completion),
 ):
@@ -67,6 +67,20 @@ def chat_completion(
 
     engine = get_cached_engine(ai_model_id=req.ai_model_id)
 
-    result = ChatService.chat_completion(engine, req.question)
+    # Sử dụng phiên bản async để có thể cancel
+    result = await ChatService.chat_completion_async(
+        engine, req.question, client_id=req.client_id
+    )
 
     return APIResponse.success(data=result)
+
+
+@router.post("/stop", summary="Dừng quá trình chat", tags=["Chat"], dependencies=[RequireAdminOrUser])
+async def stop_chat(client_id: str):
+    """
+    Dừng một task chat đang chạy cho client_id cụ thể.
+    """
+    success = await ChatService.stop_chat(client_id)
+    if success:
+        return APIResponse.success(message=f"Đã dừng task cho client {client_id}")
+    return APIResponse.error(message=f"Không tìm thấy task đang chạy cho client {client_id}")

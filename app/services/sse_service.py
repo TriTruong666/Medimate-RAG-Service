@@ -22,7 +22,7 @@ class SSEService:
             while True:
                 try:
                     # Chờ dữ liệu từ queue hoặc timeout sau 30s để gửi heartbeat
-                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    data = await asyncio.wait_for(queue.get(), timeout=5.0)
                     yield data
                 except asyncio.TimeoutError:
                     # Gửi heartbeat (comment trong giao thức SSE) để giữ kết nối

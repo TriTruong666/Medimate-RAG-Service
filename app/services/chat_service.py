@@ -1,6 +1,8 @@
+import asyncio
 import json
 import time
 import logging
+from typing import Dict, Any, Optional
 
 from fastapi import HTTPException, status
 from llama_index.core.base.response.schema import StreamingResponse
@@ -9,6 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 class ChatService:
+    # Lưu trữ các task đang chạy để có thể cancel
+    _active_tasks: Dict[str, asyncio.Task] = {}
+
+    @classmethod
+    async def stop_chat(cls, client_id: str) -> bool:
+        """Dừng một process chat đang chạy của client."""
+        if client_id in cls._active_tasks:
+            task = cls._active_tasks[client_id]
+            task.cancel()
+            # Xóa khỏi registry ngay lập tức
+            del cls._active_tasks[client_id]
+            logger.info(f"Đã dừng task chat cho client: {client_id}")
+            return True
+        return False
     @staticmethod
     def build_quick_reply(question: str):
         normalized_question = question.strip().lower()
@@ -158,6 +174,65 @@ class ChatService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Lỗi chat completion",
             )
+
+    @staticmethod
+    async def chat_completion_async(query_engine, question: str, client_id: str = None):
+        """Phiên bản async của chat_completion, hỗ trợ cancellation."""
+        quick_reply = ChatService.build_quick_reply(question)
+        if quick_reply is not None:
+            return quick_reply
+
+        if not query_engine:
+            raise ValueError("Engine chưa sẵn sàng")
+
+        # Tạo task cho việc query
+        async def _run_query():
+            return await query_engine.aquery(question)
+
+        task = asyncio.create_task(_run_query())
+
+        if client_id:
+            ChatService._active_tasks[client_id] = task
+
+        try:
+            response_obj = await task
+
+            if hasattr(response_obj, "response_gen") and not isinstance(response_obj.response_gen, str):
+                # Nếu là generator (streaming), ta lấy hết text
+                final_text = ""
+                for token in response_obj.response_gen:
+                    final_text += token
+            else:
+                final_text = getattr(response_obj, "response", str(response_obj)) or ""
+
+            sources = []
+            if getattr(response_obj, "source_nodes", None):
+                sources = ChatService._format_sources(response_obj.source_nodes)
+
+            if not final_text.strip() or final_text.strip() == "Empty Response":
+                if not sources:
+                    final_text = "Chào bạn! Tôi là trợ lý ảo Medimate AI. Hiện tại tôi chưa tìm thấy tài liệu cụ thể trong cơ sở dữ liệu để giải đáp câu hỏi này một cách chi tiết nhất. Tuy nhiên, tôi vẫn luôn sẵn sàng hỗ trợ bạn các thông tin y khoa cơ bản khác nếu bạn cần!"
+                else:
+                    final_text = "Xin lỗi, tôi đã tìm thấy một số tài liệu liên quan nhưng không thể tổng hợp được câu trả lời chính xác nhất. Với vai trò là trợ lý y tế Medimate, tôi khuyên bạn nên kiểm tra kỹ các nguồn bên dưới hoặc tham khảo ý kiến bác sĩ chuyên khoa nhé."
+
+            return {"answer": final_text, "sources": sources}
+
+        except asyncio.CancelledError:
+            logger.info(f"Task chat cho client {client_id} đã bị hủy.")
+            raise HTTPException(
+                status_code=status.HTTP_408_REQUEST_TIMEOUT,
+                detail="Yêu cầu đã bị hủy bởi người dùng."
+            )
+        except Exception:
+            logger.exception("Lỗi chat completion async")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Lỗi chat completion",
+            )
+        finally:
+            if client_id and client_id in ChatService._active_tasks:
+                if ChatService._active_tasks[client_id] == task:
+                    del ChatService._active_tasks[client_id]
 
     @staticmethod
     def _format_sources(source_nodes):
